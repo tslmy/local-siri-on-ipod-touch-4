@@ -1,12 +1,19 @@
 # Convert a HF llama-architecture model (default SmolLM2-135M-Instruct) into
-# the Q8_0 format read by llm.c, plus a byte-level BPE tokenizer file.
-#   uv run convert/llm_convert.py --wbits 4 --ebits 8 --out build/models/smollm2-135m-q4e8
+# the format read by llm.c, plus a byte-level BPE tokenizer file.
+#   uv run convert/llm_convert.py --wbits 4 --ebits 8 --out build/models/smollm2-135m-q4e8   (Q4_0 / Q8_0, v3)
+#   uv run convert/llm_convert.py --cq 4 --gptq --out build/models/smollm2-135m-cq4          (CQ, v4; see cq.py)
 import struct
 import json
 import numpy as np
+import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+import cq  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--model", default="HuggingFaceTB/SmolLM2-135M-Instruct")
@@ -14,11 +21,23 @@ ap.add_argument("--revision", default="12fd25f77366fa6b3b4b768ec3050bf629380bac"
 ap.add_argument("--out", default="smollm2-135m")
 ap.add_argument("--wbits", type=int, default=8, choices=[4, 8])  # layer matrices
 ap.add_argument("--ebits", type=int, default=8, choices=[4, 8])  # tied embedding / classifier
+ap.add_argument("--cq", type=int, default=0, choices=[0, 2, 4], help="store every matrix as CQ with this many bits")
+ap.add_argument("--cq-mlp", type=int, default=0, choices=[0, 2, 4], help="bits for the MLP matrices (default: --cq)")
+ap.add_argument("--gptq", action="store_true", help="CQ: choose indices by GPTQ on calibration chats (see cq_gptq.py)")
 args = ap.parse_args()
+CQ_G = 64
 name, prefix = args.model, args.out
-m = AutoModelForCausalLM.from_pretrained(name, revision=args.revision)
+m = AutoModelForCausalLM.from_pretrained(name, revision=args.revision, dtype=torch.float32).eval()
 c = m.config
 sd = {k: v.float().numpy() for k, v in m.state_dict().items()}
+GPTQ = {}
+if args.cq and args.gptq:
+    import cq_gptq
+
+    SYSTEM = "You are Siri, a helpful voice assistant on an iPod. Answer in one or two short sentences."
+    _tok = AutoTokenizer.from_pretrained(name, revision=args.revision)
+    assert not args.cq_mlp or args.cq_mlp == args.cq, "--gptq uses one width"
+    GPTQ = cq_gptq.quantize_model(m, _tok, SYSTEM, args.cq, 64)
 GS = 32
 assert c.tie_word_embeddings
 theta = c.rope_parameters["rope_theta"] if getattr(c, "rope_parameters", None) else c.rope_theta
@@ -28,7 +47,7 @@ f.write(
     struct.pack(
         "<8i2f2i",
         0x4C4C4D51,
-        3,
+        4 if args.cq else 3,
         c.hidden_size,
         c.intermediate_size,
         c.num_hidden_layers,
@@ -37,10 +56,23 @@ f.write(
         c.vocab_size,
         float(theta),
         float(c.rms_norm_eps),
-        args.wbits,
-        args.ebits,
+        args.cq or args.wbits,
+        args.cq or args.ebits,
     )
 )
+if args.cq:  # v4: the 2- and 4-bit unit codebooks, then CQ matrices
+    f.write(cq.lloyd_max_gaussian(2).astype("<f4").tobytes())
+    f.write(cq.lloyd_max_gaussian(4).astype("<f4").tobytes())
+
+
+def cqm(n, bits):
+    """CQ matrix: i32 bits, i32 group, packed indices, then kernel-ready f32 group scales (norm * kscale)."""
+    idx, norms = GPTQ[n] if n in GPTQ else cq.quantize(sd[n], bits, CQ_G)
+    u = cq.lloyd_max_gaussian(bits)
+    kscale = np.abs(u).max() / np.sqrt(CQ_G) / 127.0
+    f.write(struct.pack("<2i", bits, CQ_G))
+    f.write(cq.pack(idx, bits).tobytes())
+    f.write((norms * kscale).astype("<f4").tobytes())
 
 
 def fp32(n):
@@ -66,16 +98,23 @@ def q8(n, bits=None):
     f.write(np.ascontiguousarray(s.reshape(o // 4, 4, -1).transpose(0, 2, 1)).astype("<f4").tobytes())
 
 
-q8("model.embed_tokens.weight", args.ebits)
+def mat(n, mlp=False, emb=False):
+    if args.cq:
+        cqm(n, (args.cq_mlp or args.cq) if mlp else args.cq)
+    else:
+        q8(n, args.ebits if emb else None)
+
+
+mat("model.embed_tokens.weight", emb=True)
 for l in range(c.num_hidden_layers):
     p = f"model.layers.{l}."
     fp32(p + "input_layernorm.weight")
     for n in "qkvo":
-        q8(p + f"self_attn.{n}_proj.weight")
+        mat(p + f"self_attn.{n}_proj.weight")
     fp32(p + "post_attention_layernorm.weight")
-    q8(p + "mlp.gate_proj.weight")
-    q8(p + "mlp.up_proj.weight")
-    q8(p + "mlp.down_proj.weight")
+    mat(p + "mlp.gate_proj.weight", mlp=True)
+    mat(p + "mlp.up_proj.weight", mlp=True)
+    mat(p + "mlp.down_proj.weight", mlp=True)
 fp32("model.norm.weight")
 f.close()
 

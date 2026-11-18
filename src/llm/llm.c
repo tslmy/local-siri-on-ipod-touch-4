@@ -1,11 +1,12 @@
 // Small llama-architecture LLM runner (GQA, RMSNorm, SwiGLU, tied embeddings)
-// with Q8_0 weights mmap'd from convert_llama.py output and a GPT-2 style
-// byte-level BPE tokenizer. Shares its NEON kernels with moonshine.c.
+// with weights mmap'd from convert/llm_convert.py output and a GPT-2 style
+// byte-level BPE tokenizer. Weights are Q8_0/Q4_0 (file v1-3, kernels in q8.h)
+// or CQ (v4, kernels in cq.h, shared with the Whistle speech model).
 //
 // Build: cc -O3 -ffast-math -DLLM_MAIN llm.c -lm -o llm
 // Usage: llm smollm2-135m.bin smollm2-135m.tok "question" [max_tokens]
 #include "llm.h"
-#include "../common/q8.h"
+#include "../common/cq.h"
 #include <stdio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -13,12 +14,14 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 
-typedef struct { const float *an; Q8 q, k, v, o; const float *fn; Q8 g, u, d; } Layer;
+// A weight matrix in either format.
+typedef struct { int cq; Q8 q8; CQ c; int out, in; } Mat;
+typedef struct { const float *an; Mat q, k, v, o; const float *fn; Mat g, u, d; } Layer;
 
 struct llm {
     int dim, hidden, nl, nh, nkv, vocab, hd, kvd, maxseq;
     float theta, eps;
-    Q8 embed, head; Layer *L; const float *fnorm;
+    Mat embed, head; Layer *L; const float *fnorm;
     void *map; size_t map_len; int fd;
     // tokenizer
     char **tok; int *toklen; int nmerge; int *mhash; int hsize; int (*merge)[3]; int byte_id[256];
@@ -32,6 +35,16 @@ struct llm {
 
 static double now_ms(void) { struct timeval tv; gettimeofday(&tv, 0); return tv.tv_sec * 1e3 + tv.tv_usec / 1e3; }
 
+static Mat take_mat(const uint8_t **p, int out, int in, int bits, int pk, int v4) {
+    Mat w; memset(&w, 0, sizeof w); w.out = out; w.in = in; w.cq = v4;
+    if (!v4) { w.q8 = q8_take_ex(p, out, in, bits, pk); return w; }
+    const int32_t *h = (const int32_t *)*p; *p += 8;
+    w.c.bits = h[0]; w.c.g = h[1]; w.c.out = out; w.c.in = in;
+    w.c.q = *p; *p += (size_t)out * in * w.c.bits / 8;
+    w.c.ns = (float *)*p; *p += (size_t)out * (in / w.c.g) * 4;
+    return w;
+}
+
 static int hkey(int a, int b, int hs) { return (int)(((unsigned)a * 2654435761u ^ (unsigned)b * 40503u) & (hs - 1)); }
 
 llm_t *llm_load(const char *model, const char *tokpath, int maxseq) {
@@ -41,23 +54,24 @@ llm_t *llm_load(const char *model, const char *tokpath, int maxseq) {
     void *map = mmap(NULL, st.st_size, PROT_READ, MAP_SHARED, fd, 0);
     if (map == MAP_FAILED) { perror("mmap"); close(fd); return NULL; }
     const int32_t *h = map;
-    if (h[0] != 0x4c4c4d51 || h[1] < 1 || h[1] > 3) { fprintf(stderr, "bad llm file\n"); return NULL; }
+    if (h[0] != 0x4c4c4d51 || h[1] < 1 || h[1] > 4) { fprintf(stderr, "bad llm file\n"); return NULL; }
     llm_t *m = calloc(1, sizeof *m);
     m->map = map; m->map_len = st.st_size; m->fd = fd;
     m->dim = h[2]; m->hidden = h[3]; m->nl = h[4]; m->nh = h[5]; m->nkv = h[6]; m->vocab = h[7];
     m->theta = ((const float *)h)[8]; m->eps = ((const float *)h)[9];
     m->hd = m->dim / m->nh; m->kvd = m->hd * m->nkv; m->maxseq = maxseq;
-    int wb = h[1] >= 2 ? h[10] : 8, eb = h[1] >= 2 ? h[11] : 8, pk = h[1] >= 3;
+    int wb = h[1] >= 2 ? h[10] : 8, eb = h[1] >= 2 ? h[11] : 8, pk = h[1] >= 3, v4 = h[1] >= 4;
     const uint8_t *p = (const uint8_t *)map + (h[1] >= 2 ? 48 : 40);
+    if (v4) { cq_set_codebook(2, (const float *)p); cq_set_codebook(4, (const float *)p + 4); p += 20 * 4; }
     int D = m->dim, H = m->hidden;
-    m->embed = q8_take_ex(&p, m->vocab, D, eb, pk);
+    m->embed = take_mat(&p, m->vocab, D, eb, pk, v4);
     m->L = calloc(m->nl, sizeof(Layer));
     for (int l = 0; l < m->nl; l++) {
         Layer *L = &m->L[l];
         L->an = (const float *)p; p += D * 4;
-        L->q = q8_take_ex(&p, D, D, wb, pk); L->k = q8_take_ex(&p, m->kvd, D, wb, pk); L->v = q8_take_ex(&p, m->kvd, D, wb, pk); L->o = q8_take_ex(&p, D, D, wb, pk);
+        L->q = take_mat(&p, D, D, wb, pk, v4); L->k = take_mat(&p, m->kvd, D, wb, pk, v4); L->v = take_mat(&p, m->kvd, D, wb, pk, v4); L->o = take_mat(&p, D, D, wb, pk, v4);
         L->fn = (const float *)p; p += D * 4;
-        L->g = q8_take_ex(&p, H, D, wb, pk); L->u = q8_take_ex(&p, H, D, wb, pk); L->d = q8_take_ex(&p, D, H, wb, pk);
+        L->g = take_mat(&p, H, D, wb, pk, v4); L->u = take_mat(&p, H, D, wb, pk, v4); L->d = take_mat(&p, D, H, wb, pk, v4);
     }
     m->fnorm = (const float *)p; p += D * 4;
     // Output classifier = the tied embedding, optionally limited to the first N token ids.
@@ -65,7 +79,7 @@ llm_t *llm_load(const char *model, const char *tokpath, int maxseq) {
     // stays complete. Saves resident memory and per-token bandwidth.
     m->head = m->embed;
     { const char *e = getenv("LLM_VOCAB_LIMIT"); int lim = e ? atoi(e) : 0;
-      if (lim >= 1024 && lim < m->vocab) m->head.out = lim & ~3; }
+      if (lim >= 1024 && lim < m->vocab) { m->head.out = lim & ~3; m->head.q8.out = m->head.c.out = m->head.out; } }
     if ((size_t)(p - (const uint8_t *)map) != (size_t)st.st_size) { fprintf(stderr, "llm size mismatch\n"); return NULL; }
 
     FILE *tf = fopen(tokpath, "rb");
@@ -238,21 +252,31 @@ static void attend_gqa(llm_t *m, float *out, const float *q, const float *K, con
     }
 }
 
+// Prepare T rows of activations for W (and any matrix of the same format and width), then multiply.
+static void mprep(llm_t *m, const Mat *W, const float *x, int T) {
+    if (!W->cq) { quantize(x, m->xq, m->xs, T * W->in); return; }
+    int ng = W->in / W->c.g;
+    for (int t = 0; t < T; t++) cq_prep(x + (size_t)t * W->in, W->in, W->c.bits, W->c.g, m->xq + (size_t)t * W->in, m->xs + (size_t)t * ng);
+}
+static void mmul(llm_t *m, float *out, const Mat *W, int T) {
+    if (!W->cq) matmul(out, m->xq, m->xs, T, W->in, &W->q8, NULL);
+    else cq_mm(out, W->out, &W->c, 0, W->out, m->xq, m->xs, T);
+}
+static void mrow(const Mat *W, int o, float *out) { if (W->cq) cq_row(&W->c, o, out); else q8_row(&W->q8, o, out); }
+
 // Run T (<= maxT) tokens at positions pos..pos+T-1; logits for the last one.
 static void forward_chunk(llm_t *m, const int *toks, int T, int want_logits) {
     m->t_mark = now_ms();
     int D = m->dim, H = m->hidden, kvd = m->kvd;
     for (int t = 0; t < T; t++) {
-        q8_row(&m->embed, toks[t], m->x + t * D);
+        mrow(&m->embed, toks[t], m->x + t * D);
     }
     for (int l = 0; l < m->nl; l++) {
         Layer *L = &m->L[l];
         float *Kc = m->kc + (size_t)l * m->maxseq * kvd, *Vc = m->vc + (size_t)l * m->maxseq * kvd;
         for (int t = 0; t < T; t++) rmsnorm(m->xb + t * D, m->x + t * D, L->an, D, m->eps);
-        quantize(m->xb, m->xq, m->xs, T * D);
-        matmul(m->q, m->xq, m->xs, T, D, &L->q, NULL);
-        matmul(m->k, m->xq, m->xs, T, D, &L->k, NULL);
-        matmul(m->v, m->xq, m->xs, T, D, &L->v, NULL);
+        mprep(m, &L->q, m->xb, T);
+        mmul(m, m->q, &L->q, T); mmul(m, m->k, &L->k, T); mmul(m, m->v, &L->v, T);
         for (int t = 0; t < T; t++) {
             rope_neox(m, m->q + t * D, m->nh, m->pos + t);
             rope_neox(m, m->k + t * kvd, m->nkv, m->pos + t);
@@ -260,24 +284,23 @@ static void forward_chunk(llm_t *m, const int *toks, int T, int want_logits) {
             memcpy(Vc + (size_t)(m->pos + t) * kvd, m->v + t * kvd, kvd * 4);
         }
         for (int t = 0; t < T; t++) attend_gqa(m, m->xb + t * D, m->q + t * D, Kc, Vc, m->pos + t + 1);
-        quantize(m->xb, m->xq, m->xs, T * D);
-        matmul(m->q, m->xq, m->xs, T, D, &L->o, NULL);
+        mprep(m, &L->o, m->xb, T);
+        mmul(m, m->q, &L->o, T);
         for (int i = 0; i < T * D; i++) m->x[i] += m->q[i];
         for (int t = 0; t < T; t++) rmsnorm(m->xb + t * D, m->x + t * D, L->fn, D, m->eps);
-        quantize(m->xb, m->xq, m->xs, T * D);
-        matmul(m->h1, m->xq, m->xs, T, D, &L->g, NULL);
-        matmul(m->h2, m->xq, m->xs, T, D, &L->u, NULL);
+        mprep(m, &L->g, m->xb, T);
+        mmul(m, m->h1, &L->g, T); mmul(m, m->h2, &L->u, T);
         swiglu_vec(m->h2, m->h1, (size_t)T * H);
-        quantize(m->h2, m->xq, m->xs, T * H);
-        matmul(m->q, m->xq, m->xs, T, H, &L->d, NULL);
+        mprep(m, &L->d, m->h2, T);
+        mmul(m, m->q, &L->d, T);
         for (int i = 0; i < T * D; i++) m->x[i] += m->q[i];
     }
     m->pos += T;
     double tl0 = now_ms(); m->t_layers += tl0 - m->t_mark;
     if (want_logits) {
         rmsnorm(m->xb, m->x + (T - 1) * D, m->fnorm, D, m->eps);
-        quantize(m->xb, m->xq, m->xs, D);
-        matmul(m->logits, m->xq, m->xs, 1, D, &m->head, NULL);
+        mprep(m, &m->head, m->xb, 1);
+        mmul(m, m->logits, &m->head, 1);
         m->t_head += now_ms() - tl0;
     }
 }
@@ -286,9 +309,10 @@ void llm_advise(llm_t *m, int need) { madvise(m->map, m->map_len, need ? MADV_WI
 // Pull everything a forward pass reads into the page cache, sequentially: the transformer layers
 // and the classifier's slice of the embedding (rows beyond LLM_VOCAB_LIMIT are only looked up).
 void llm_prefetch(llm_t *m) {
+    if (m->embed.cq) { prefetch_range(m->fd, 0, m->map_len); return; }
     const uint8_t *base = m->map;
-    size_t qrow = (size_t)m->embed.in * m->embed.bits / 8, ng = m->embed.in / GS;
-    size_t q0 = (const uint8_t *)m->embed.q - base, s0 = (const uint8_t *)m->embed.s4 - base;
+    size_t qrow = (size_t)m->embed.in * m->embed.q8.bits / 8, ng = m->embed.in / GS;
+    size_t q0 = (const uint8_t *)m->embed.q8.q - base, s0 = (const uint8_t *)m->embed.q8.s4 - base;
     prefetch_range(m->fd, 0, q0);                                         // header
     prefetch_range(m->fd, q0, (size_t)m->head.out * qrow);                // classifier rows
     prefetch_range(m->fd, s0, (size_t)m->head.out * ng * 4);              // their scales
@@ -376,10 +400,16 @@ int main(int argc, char **argv) {
     fprintf(stderr, "system prefix: %d tok in %.0f ms (%.1f tok/s)\n", pn, pm, pn * 1000.0 / pm);
     n = llm_chat_user(m, argv[3], ids, 512);
     llm_feed(m, ids, n);
+    if (getenv("LLM_DUMP")) {   // prompt ids + first-step logits, for comparing against a reference
+        FILE *f = fopen(getenv("LLM_DUMP"), "wb");
+        int tot = llm_get_pos(m), all[512], c = llm_chat_prefix(m, sys, all, 512);
+        c += llm_chat_user(m, argv[3], all + c, 512 - c);
+        fwrite(&tot, 4, 1, f); fwrite(all, 4, c, f); fwrite(m->logits, 4, m->vocab, f); fclose(f);
+    }
     llm_generate(m, maxnew, 1.1f, print_cb, NULL);
     printf("\n");
     llm_stats(m, &pm, &pn, &gm, &gn);
-    fprintf(stderr, "time in layers %.0f ms, classifier %.0f ms\n", m->t_layers, m->t_head);
+    fprintf(stderr, "time in layers %.0f ms, classifier %.0f ms (cq matmul %.0f, prep %.0f)\n", m->t_layers, m->t_head, cq_ms_mm, cq_ms_prep);
     fprintf(stderr, "prompt %d tok in %.0f ms (%.1f tok/s) | gen %d tok in %.0f ms (%.2f tok/s)\n",
             pn, pm, pn * 1000.0 / pm, gn, gm, gn ? gn * 1000.0 / gm : 0);
     return 0;
