@@ -14,14 +14,15 @@ The iPod touch 4th generation never got Siri: Apple shipped it only on the iPhon
 Hold Home ─▶ SpringBoard's Siri UI (iPhone 4S files) ─▶ assistantd ──ACE over loopback──▶ acesrv
                                                                                           │ audio
                                                                                           ▼
-                                                               localsirid: Moonshine Tiny ─▶ SmolLM2-135M
+                                                                    localsirid: Whistle ─▶ SmolLM2-135M
 ```
 
 - **Siri itself** is Apple's: the UI, `assistantd` and the rest come from the iPhone 4S iOS 6.1.3 firmware, which you download from Apple yourself. Only one binary, `AssistantUI`, is missing from the iPod's own system, and it has to be pulled out of the 4S's shared library cache and repaired so it loads on another device.
 - **`acesrv`** is a small server that speaks Siri's ACE protocol over loopback. It stands in for Apple's servers, which went offline long ago.
 - **`localsirid`** runs the two models in plain C with ARM NEON:
-  - [Moonshine Tiny](https://huggingface.co/UsefulSensors/moonshine-tiny) (27M parameters, 8-bit) for speech recognition;
-  - [SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) (4-bit layers) for the answer.
+  - [Whistle](https://huggingface.co/Cactus-Compute/whistle) by Cactus Compute for speech recognition. The published 16.9 MB file runs as is; its 2- and 4-bit weights never get unpacked.
+  - [SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) for the answer, stored in the same 4-bit codebook format as Whistle (76 MB). Each weight's rounding is chosen GPTQ-style.
+  - [Moonshine Tiny](https://huggingface.co/UsefulSensors/moonshine-tiny) is still supported as a fallback (`LEGACY_MODELS=1 just models`).
 - **A tweak** (`SiriCapability`) makes the iPod report the Siri capability. It also switches Siri to recording plain PCM, because the iPod has no Speex encoder, and disables response timeouts that were sized for Apple's servers.
 
 ## Status
@@ -31,11 +32,11 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 | | |
 |---|---|
 | Native Siri UI opens, listens, shows what you said, shows and speaks the answer | ✅ Live microphone, with questions spoken by a Mac nearby |
-| Speech recognition (Moonshine Tiny) | 1.5–3.5 s for a short question |
-| Answer, first word | 2–7 s after the transcript. The model pages in from flash, because the Siri UI leaves little RAM free. |
-| Answer, generation | 2–4 words/s |
-| Total, from when Siri stops listening to the full answer | about 10–20 s |
-| Answer quality | What a 135M model can do: simple facts are usually right ("Paris", "Tokyo"), other answers are often vague or wrong |
+| Speech recognition (Whistle) | 2.7–3.8 s for a short question with the Siri UI open; 1.3–2.4 s alone (`just bench`) |
+| Answer, first word | 7–8 s after the transcript: 2.9 s to read the model back from flash (the Siri UI leaves too little RAM to keep it), then 4.5 s to read the question |
+| Answer, generation | 2–2.5 tokens/s with the Siri UI open; 3.8 tokens/s alone |
+| Total, from when Siri stops listening to the full answer | about 15–20 s for a one-sentence answer |
+| Answer quality | What a 135M model can do: in live tests "Paris", "Tokyo", "Shakespeare", "Everest" and the Moon's distance were right; "ounces in a pound" still isn't |
 | Physical Home-button hold | Should behave like Activator's Siri action, which is what was tested; not pressed by hand yet |
 
 ## What you need
@@ -44,7 +45,7 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 - An iPod touch 4G on iOS 6.1.6, jailbroken (for example with p0sixspwn).
 - OpenSSH, with your public key in `/var/root/.ssh/authorized_keys`.
 - Cydia Substrate.
-- About 180 MB free on `/` and 130 MB in `/var`.
+- About 180 MB free on `/` and 100 MB in `/var`.
 - Optional: Activator. `just ask` uses it to open Siri remotely.
 
 **The Mac**
@@ -52,6 +53,7 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 - [Homebrew](https://brew.sh): `brew install just uv ldid boost`.
 - **Xcode 4.6.3** (`xcode4630916281a.dmg`) from [Apple's developer downloads](https://developer.apple.com/download/all/?q=xcode%204.6.3), which needs a free Apple ID. It's the newest toolchain that still targets armv7 and iOS 6.
 - About 4 GB of disk, and internet access for the firmware (925 MB from Apple) and the models (from Hugging Face).
+- `just models` converts the chat model with PyTorch and needs about 2 GB of RAM for a minute or two.
 
 `just doctor` checks all of this. With `IPOD` set, it checks the iPod too.
 
@@ -80,8 +82,38 @@ Use `IPOD_KEY=~/.ssh/some_key` if your login needs a particular key. You can als
 | `just build` | Cross-compiles everything that runs on the iPod into `build/ipod/` |
 | `just install` / `just uninstall` | Installs or updates over SSH (safe to repeat); uninstall removes everything and restores the backups |
 | `just smoke`, `just ask`, `just logs`, `just screenshot` | Testing |
+| `just bench` | Times the speech and chat engines on the iPod, outside Siri |
 | `just debug-on` / `debug-off` | A SpringBoard debug tweak, plus assistantd's own log in `/tmp/assistantd.log` |
 | `just install-app` | Also installs LocalSiri.app, a stand-alone Siri look-alike that uses the same on-device brain |
+
+## Choosing the models
+
+All numbers are from the iPod (`just bench`, and the daemon's log for the live runs).
+
+**Speech recognition.** Whistle ties with Moonshine Tiny on speed and needs about half the memory. In tests, Whistle heard two questions better ("Who wrote Romeo and Juliet?" and the live "ounces in a pound"); Moonshine heard one better (the synthesized "ounces").
+
+| Clip | Whistle | Moonshine Tiny |
+|---|---|---|
+| 1.9 s question | 1.29 s | 1.28 s |
+| 3.1 s question | 2.27 s | 2.24 s |
+| 4.7 s question | 2.86 s | 3.05 s |
+| Weights | 17 MB (2/4-bit) | 30 MB (8-bit) |
+
+**Chat model.** Nothing smaller than SmolLM2-135M answered reliably:
+- Cactus's Needle 3 is built for tool calling, not chat.
+- Brandon-Tiny 10M gets basic facts wrong.
+
+So the model stayed the same, and the work went into how its weights are stored. Measured on the Mac with `convert/llm_quant_eval.py`; lower perplexity is better:
+
+| Storage | Size | Perplexity |
+|---|---|---|
+| Full precision | 538 MB | 7.2 |
+| Before: 4-bit layers, 8-bit embedding | 98 MB | 10.1 |
+| 4-bit codebook (Whistle's format) | 76 MB | 9.6 |
+| 4-bit codebook with GPTQ rounding (now) | 76 MB | 8.1–8.9 |
+| 3-bit codebook | 59–66 MB | 29–81 (unusable) |
+
+The 8.1 is measured with the iPod's 8-bit activations simulated, and the 8.9 without. Alone, both 4-bit builds run at the same speed (3.8 tokens/s), limited by arithmetic. With the Siri UI open, the smaller file is what counts: reading the question dropped from 7.6 s to about 4.5 s, and generation rose from about 2 to about 2.5 tokens/s.
 
 ## What `install` changes on the iPod
 
@@ -115,29 +147,30 @@ Third-party code is fetched at build time and isn't vendored:
 - Speex 1.2.1 (BSD).
 - [kennytm's `dyld_decache`](https://github.com/kennytm/Miscellaneous) (GPLv3), which is only run on your Mac.
 
-The models are downloaded from Hugging Face under their own licences: MIT for Moonshine, Apache-2.0 for SmolLM2.
+The models are downloaded from Hugging Face under their own licences: Apache-2.0 for Whistle and SmolLM2, MIT for Moonshine.
 
 ## Layout
 
 ```
 src/localsirid/  on-device speech recognition + LLM daemon, and sirictl (test client)
-src/moonshine/   Moonshine Tiny in C + NEON
+src/whistle/     Whistle in C + NEON (reads the published whistle.cact)
+src/moonshine/   Moonshine Tiny in C + NEON (fallback)
 src/llm/         Llama-style LLM runner (GQA, RMSNorm, SwiGLU, KV cache, byte-level BPE)
-src/common/      int8/int4 NEON matmul and math kernels
+src/common/      NEON matmul kernels: codebook (cq.h), int8/int4 (q8.h)
 src/acesrv/      ACE server (Siri's protocol)
 src/tweak/       SiriCapability Substrate tweak
 src/tools/       plistset, screenshot, asllog (the iPod has no syslog), memstat, psrss
 src/debug/       SiriDebug SpringBoard tweak + sirinotify
 src/app/         LocalSiri.app (stand-alone fallback)
 port/            vfdecrypt.py, fixdylib.py, shared-cache inspectors, list of Siri files
-convert/         model converters
+convert/         model converters, the codebook quantizer + GPTQ, a NumPy reference for Whistle, quality eval
 scripts/         what the justfile runs
 docs/            the GitHub Pages article
 ```
 
 ## Credits
 
-- Speech recognition: [Moonshine](https://github.com/usefulsensors/moonshine) by Useful Sensors.
+- Speech recognition: [Whistle](https://cactuscompute.com/blog/whistle) by Cactus Compute; its codebook quantization is also what the chat model now uses. [Moonshine](https://github.com/usefulsensors/moonshine) by Useful Sensors, before it.
 - Language model: [SmolLM2](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) by Hugging Face.
 - ACE protocol: [SiriServerCore](https://github.com/janrueth/SiriServerCore) and the SiriProxy community.
 - Shared-cache extraction: [kennytm's dyld_decache](https://github.com/kennytm/Miscellaneous).

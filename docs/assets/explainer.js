@@ -20,7 +20,7 @@
       ['cache', 'AssistantUI.framework', '137 KB, repaired', 'The only binary that exists solely inside the 4S\'s shared cache. Extracting it and making it load elsewhere is section 3.'],
       ['ours', 'SiriCapability tweak', 'Substrate', 'Says yes to the capability check, records PCM instead of Speex, and disables timeouts sized for Apple\'s servers.'],
       ['ours', 'acesrv', 'ACE server', 'Stands in for guzzoni.apple.com on 127.0.0.1:4443 (section 6).'],
-      ['ours', 'localsirid', 'speech + LLM', 'Moonshine Tiny and SmolLM2-135M in C and NEON (section 8).'],
+      ['ours', 'localsirid', 'speech + LLM', 'Whistle and SmolLM2-135M in C and NEON (section 8).'],
       ['ours', '/etc/hosts entry', 'guzzoni.apple.com → 127.0.0.1', 'Makes sure Siri can only ever reach the iPod itself (section 7).'],
     ];
     const grid = $(fig, '.sx-inv'), note = $(fig, '.sx-note');
@@ -81,7 +81,7 @@
       ['c', 'Chunk', 'A sync chunk arrives in the middle of the speech.'],
       ['s', 'ChunkAccepted', 'acesrv accepts every chunk, echoing its new generation.'],
       ['c', 'FinishSpeech', 'Siri\'s endpointer decided you stopped. Audio goes to localsirid on a worker thread; the main loop keeps answering pings.'],
-      ['s', 'SpeechRecognized  "What is the capital of France?"', 'Sent as soon as Moonshine finishes, about 2.5 s later, so your words appear while the language model works.'],
+      ['s', 'SpeechRecognized  "What is the capital of France?"', 'Sent as soon as speech recognition finishes, about 3 s later, so your words appear while the language model works.'],
       ['s', 'AddViews  AssistantUtteranceView  "The capital of France is Paris."', 'The answer, with speakableText, so Siri also reads it aloud.'],
       ['s', 'RequestCompleted', 'Done. Siri plays its end tone and speaks.'],
       ['c', 'Metrics', 'Siri reports timing data to the server, which acesrv ignores.'],
@@ -110,26 +110,27 @@
 
   // 4. RAM budget during a question
   const ram = (fig) => {
-    const state = { siri: true, prefetch: true };
+    const state = { siri: true, prefetch: true, cq: true };
     const bar = $(fig, '.sx-bar'), note = $(fig, '.sx-note');
     const draw = () => {
       const parts = [
+        ['reserved: GPU, firmware', 60, '#4a4a4a'],
         ['wired: kernel, drivers', 46, '#6b6b6b'],
         ['daemons', 34, '#8a8a8a'],
         ['SpringBoard', 20, '#2f6db3'],
         ...(state.siri ? [['Siri: UI, assistantd, voice', 25, '#7a4fd0']] : []),
         ['other file cache', 20, '#a0a0a0'],
-        ['Moonshine', 30, '#c88d0c'],
-        ['SmolLM2 working set', 80, '#2e7d4f'],
+        state.cq ? ['Whistle', 17, '#c88d0c'] : ['Moonshine', 30, '#c88d0c'],
+        ['SmolLM2 working set', state.cq ? 76 : 80, '#2e7d4f'],
       ];
       const total = parts.reduce((s, p) => s + p[1], 0), over = Math.max(0, total - 256);
       bar.replaceChildren(...parts.map(([name, mb, c]) => {
         const d = el('div', null, `${name} ${mb}`); d.style.flex = `0 0 ${(mb / Math.max(256, total)) * 100}%`; d.style.background = c; d.title = `${name}: ~${mb} MB`; return d;
       }));
       if (over) { const d = el('div', 'over', ''); d.style.flex = `0 0 ${(over / total) * 100}%`; d.title = `${over} MB more than the iPod has`; bar.append(d); }
-      const speed = state.prefetch ? 80 : 6, reload = 80 / speed;
+      const lm = state.cq ? 76 : 80, speed = state.prefetch ? 26 : 6, reload = lm / speed;   // measured with Siri open
       note.textContent = over
-        ? `Needs ~${total} MB of 256: the models can't both stay resident, so each stage evicts the other. Bringing SmolLM2's 80 MB back takes ~${reload.toFixed(reload < 2 ? 1 : 0)} s at ${speed} MB/s${state.prefetch ? ' (one sequential read)' : ' (one page fault at a time)'}.`
+        ? `Needs ~${total} MB of 256: the models can't both stay resident, so each stage evicts the other. Bringing SmolLM2's ${lm} MB back takes ~${reload.toFixed(reload < 2 ? 1 : 0)} s at ${speed} MB/s${state.prefetch ? ' (one sequential read)' : ' (one page fault at a time)'}.`
         : `Needs ~${total} MB of 256: both models stay in RAM between questions, and nothing has to be read back from flash.`;
     };
     fig.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
@@ -143,6 +144,7 @@
     const data = {
       before: { label: 'First version inside Siri: every stage pages its model in from flash one fault at a time.', rows: [['speech recognition', 'asr', 6.4], ['prompt (13 tokens)', 'prompt', 15.2], ['answer (7 tokens)', 'gen', 5.7]] },
       after: { label: 'Speech model prefetched while you talk, silence trimmed, the LLM read sequentially once the transcript is out.', rows: [['speech recognition', 'asr', 2.4], ['LLM prefetch', 'load', 2.9], ['prompt (13 tokens)', 'prompt', 6.4], ['answer (7 tokens)', 'gen', 2.5]] },
+      now: { label: 'Whistle and the 4-bit codebook SmolLM2 (with a terser system prompt). Smaller files read the question faster; the answer is also more often right.', rows: [['speech recognition', 'asr', 3.3], ['LLM prefetch', 'load', 3.0], ['prompt (13 tokens)', 'prompt', 4.2], ['answer (7 tokens)', 'gen', 3.3]] },
       alone: { label: 'For reference: the same question straight to localsirid, Siri closed, models warm.', rows: [['speech recognition', 'asr', 1.35], ['prompt (13 tokens)', 'prompt', 1.8], ['answer (7 tokens)', 'gen', 1.7]] },
     };
     const MAX = 28, box = $(fig, '.sx-tl'), note = $(fig, '.sx-note'), buttons = [...fig.querySelectorAll('button')];

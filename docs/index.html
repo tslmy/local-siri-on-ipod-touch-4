@@ -22,13 +22,13 @@
 
 <div class="shots wide">
   <figure><img src="img/siri-open.jpg" alt="Siri's first screen on the iPod" width="320" height="480"><figcaption>Hold Home: Apple's Siri, on an iPod</figcaption></figure>
-  <figure><img src="img/siri-heard.jpg" alt="Siri showing the recognised question" width="320" height="480"><figcaption>Moonshine Tiny heard the question</figcaption></figure>
+  <figure><img src="img/siri-heard.jpg" alt="Siri showing the recognised question" width="320" height="480"><figcaption>The speech model heard the question</figcaption></figure>
   <figure><img src="img/siri-answer.jpg" alt="Siri showing the answer" width="320" height="480"><figcaption>SmolLM2-135M answered, and Siri spoke it</figcaption></figure>
 </div>
 
 <p>Siri arrived in October 2011 with the iPhone 4S and iOS 5. The iPod touch 4th generation, sold until 2013 and updated to iOS 6.1.6, never got it. Apple's line was that Siri needed the 4S's hardware. In truth, Siri's speech recognition and answers ran on Apple's servers, which went dark years ago, so even a real 4S no longer has a working Siri.</p>
 
-<p>This project gives the iPod the real thing, Apple's own interface, and answers it with a small "server" that runs <em>on the iPod</em>. Speech recognition is <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> and the answers come from <a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a>, both rewritten in plain C. Nothing leaves the device.<span class="sidenote-wrap"><label for="sn-1" class="sidenote-number"></label><input type="checkbox" id="sn-1" class="sidenote-toggle"><span class="sidenote">The repository holds only original code. Apple's files come from firmware you download from Apple yourself, and stay on your machine. See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4#legal">README</a>.</span></span></p>
+<p>This project gives the iPod the real thing, Apple's own interface, and answers it with a small "server" that runs <em>on the iPod</em>. Speech recognition is Cactus Compute's <a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a> and the answers come from <a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a>, both rewritten in plain C. Nothing leaves the device.<span class="sidenote-wrap"><label for="sn-1" class="sidenote-number"></label><input type="checkbox" id="sn-1" class="sidenote-toggle"><span class="sidenote">The repository holds only original code. Apple's files come from firmware you download from Apple yourself, and stay on your machine. See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4#legal">README</a>.</span></span></p>
 
 <nav class="toc" aria-label="Contents">
 <h2 id="contents">Contents</h2>
@@ -180,10 +180,11 @@
 
 <p><code>localsirid</code> is a daemon with both models loaded via <code>mmap</code>:</p>
 <ul>
-<li><strong>Moonshine Tiny</strong> (27M parameters, 30 MB at 8 bits) turns audio into text. It's an encoder–decoder transformer with a convolutional front end. Ported to C, its output matches the reference implementation on the test clips.</li>
-<li><strong>SmolLM2-135M-Instruct</strong> writes the answer. Its transformer layers are 4-bit and the embedding 8-bit, 98 MB in all. Only the 24,576 most common tokens are scored at each step. That halves the classifier, and the answers on a test set don't change. At 16,384 they do.</li>
+<li><strong>Whistle</strong> turns audio into text. It's an encoder–decoder transformer with a few unusual parts: Kronecker-factored "Hadamard" MLPs, four-lane hyper-connections between layers, and hashed n-gram memories. Cactus ships it as one 16.9 MB file. The C port reads that file as it is, and its transcripts match a NumPy reference, which in turn matches Cactus's own engine.</li>
+<li><strong>SmolLM2-135M-Instruct</strong> writes the answer. It's stored in Whistle's weight format, 76 MB in all. Each weight's rounding is chosen GPTQ-style against real activations, rather than to the nearest level.</li>
 </ul>
-<p>Both run on the same NEON kernel: int8 or int4 weights times int8 activations, four rows at a time, with one float scale per 32 weights. The scales are stored in the exact order the kernel reads them, so they're used straight from the file.</p>
+<p>That format is codebook quantization. Each group of weights is rotated by a Walsh–Hadamard matrix, which makes its values look Gaussian. The group is then stored as one length plus a 2- or 4-bit index per weight into a codebook fitted to a Gaussian. The rotation is its own inverse, so the kernel never rebuilds the weights. Instead it rotates the activations once per group with a fast transform and turns each index into an int8 level with one NEON table lookup.</p>
+<p>The earlier pair, Moonshine Tiny (30 MB) and an int4/int8 SmolLM2 (98 MB), is still supported as a fallback. Whistle matched Moonshine's speed on the iPod with half the memory. The codebook SmolLM2 is 22 MB smaller, and its perplexity fell from 10.1 to 8.1–8.9; full precision is 7.2. Anything below 4 bits fell apart.</p>
 
 <p>The daemon trims silence before speech recognition. Siri often keeps recording for seconds after you stop, and recognition time grows with audio length. It also skips Siri's end tone. It caches the system prompt and stops after two sentences, as Siri would.</p>
 </section>
@@ -198,6 +199,7 @@
   <div class="sx-controls">
     <button data-k="siri" aria-pressed="true">Siri UI open</button>
     <button data-k="prefetch" aria-pressed="true">sequential prefetch</button>
+    <button data-k="cq" aria-pressed="true">Whistle + 4-bit codebook LLM</button>
   </div>
   <div class="sx-bar"></div>
   <div class="sx-scale"><span>0</span><span>64</span><span>128</span><span>192</span><span>256 MB</span></div>
@@ -213,7 +215,7 @@
 
 <figure class="widget wide" data-widget="timeline">
   <figcaption><strong>From the end of speech to the full answer</strong>, for "What is the capital of France?" inside Siri.</figcaption>
-  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="alone">brain alone, warm</button></div>
+  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="now">Whistle + codebook LLM</button><button data-v="alone">brain alone, warm</button></div>
   <div class="sx-tl"></div>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
@@ -222,10 +224,10 @@
 <section>
 <h2 id="results">10. Results and what is left</h2>
 
-<p>Hold Home and ask. Siri shows your words two to four seconds after it stops listening, and the answer arrives 10 to 20 seconds after that. Siri then speaks it with the iPod's own voice. Simple facts usually come out right. Everything else gets the confident vagueness of a 135-million-parameter model.</p>
+<p>Hold Home and ask. Siri shows your words about three seconds after it stops listening, and a one-sentence answer arrives about ten seconds after that. Siri then speaks it with the iPod's own voice. In live tests it got Paris, Tokyo, Shakespeare, Everest, the Moon's distance and two plus two right; "ounces in a pound" still comes out wrong. Anything harder gets the confident vagueness of a 135-million-parameter model.</p>
 
 <ul>
-<li><strong>Latency</strong> is bound by RAM. A smaller language model would help in proportion to the memory it frees. Keeping the most-used layers resident is another option.</li>
+<li><strong>Latency</strong> is bound by RAM. Even at 76 MB the language model is evicted while speech recognition runs, then read back in 3 s. Keeping both models resident is worse, and so is reading the language model while recognition runs: either way the system evicts pages more often. Nothing smaller than SmolLM2-135M answered reliably: Cactus's Needle 3 is built for tool calling, and a 10M chat model got basic facts wrong.</li>
 <li><strong>Siri's own end-of-speech detection</strong> often waits several seconds in a noisy room. The server trims the silence afterwards, but can't make Siri stop listening sooner.</li>
 <li>Siri's sports, maps and other skills are untouched. Every question goes to the language model.</li>
 </ul>
@@ -235,7 +237,7 @@
 IPOD=root@&lt;your iPod&gt; just install</pre>
 <p>See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">repository</a> for details.</p>
 
-<p class="colophon">Credits: Moonshine by Useful Sensors; SmolLM2 by Hugging Face; the ACE protocol as documented by SiriProxy and SiriServerCore; <code>dyld_decache</code> by kennytm; firmware keys from The Apple Wiki.</p>
+<p class="colophon">Credits: Whistle and its codebook quantization by Cactus Compute; Moonshine by Useful Sensors; SmolLM2 by Hugging Face; the ACE protocol as documented by SiriProxy and SiriServerCore; <code>dyld_decache</code> by kennytm; firmware keys from The Apple Wiki.</p>
 </section>
 
       </div>
