@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key><string>com.lmy.localsirid</string>
+	<key>ProgramArguments</key>
+	<array><string>/var/root/siri/run.sh</string></array>
+	<key>JetsamProperties</key>
+	<dict><key>JetsamMemoryLimit</key><integer>60000</integer></dict>
+	<key>POSIXSpawnType</key><string>Interactive</string>
+	<key>RunAtLoad</key><true/>
+	<key>KeepAlive</key><true/>
+	<key>StandardErrorPath</key><string>/var/root/siri/localsirid.log</string>
+</dict>
+</plist>

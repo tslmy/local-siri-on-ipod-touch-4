@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Siri on an iPod touch 4, answered on the device</title>
+    <meta name="description" content="How the genuine iOS 6 Siri interface was brought to an iPod touch 4th generation and wired to speech recognition and a language model that run on the iPod itself." />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="stylesheet" href="assets/site.css" />
+    <link rel="stylesheet" href="assets/explainer.css" />
+  </head>
+  <body>
+    <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
+    <article>
+      <h1>Siri on an iPod touch 4, answered on the device</h1>
+      <time datetime="2026-11-18">2026-11-18</time>
+      <div class="prose siri-explainer">
+
+<p class="lede"><em>How the genuine iOS 6 Siri interface came to a 2010 iPod, and how its questions are answered by speech recognition and a language model that run on the iPod's own 1 GHz core and 256 MB of RAM.</em></p>
+
+<p class="reading-guide">The boxed figures are live: click, drag and step through them. Every number was measured on the iPod.</p>
+
+<div class="shots wide">
+  <figure><img src="img/siri-open.jpg" alt="Siri's first screen on the iPod" width="320" height="480"><figcaption>Hold Home: Apple's Siri, on an iPod</figcaption></figure>
+  <figure><img src="img/siri-heard.jpg" alt="Siri showing the recognised question" width="320" height="480"><figcaption>Moonshine Tiny heard the question</figcaption></figure>
+  <figure><img src="img/siri-answer.jpg" alt="Siri showing the answer" width="320" height="480"><figcaption>SmolLM2-135M answered, and Siri spoke it</figcaption></figure>
+</div>
+
+<p>Siri arrived in October 2011 with the iPhone 4S and iOS 5. The iPod touch 4th generation, sold until 2013 and updated to iOS 6.1.6, never got it. Apple's line was that Siri needed the 4S's hardware. In truth, Siri's speech recognition and answers ran on Apple's servers, which went dark years ago, so even a real 4S no longer has a working Siri.</p>
+
+<p>This project gives the iPod the real thing, Apple's own interface, and answers it with a small "server" that runs <em>on the iPod</em>. Speech recognition is <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> and the answers come from <a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a>, both rewritten in plain C. Nothing leaves the device.<span class="sidenote-wrap"><label for="sn-1" class="sidenote-number"></label><input type="checkbox" id="sn-1" class="sidenote-toggle"><span class="sidenote">The repository holds only original code. Apple's files come from firmware you download from Apple yourself, and stay on your machine. See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4#legal">README</a>.</span></span></p>
+
+<nav class="toc" aria-label="Contents">
+<h2 id="contents">Contents</h2>
+<ol>
+<li><a href="#hardware">The hardware</a></li>
+<li><a href="#anatomy">What Siri is made of</a></li>
+<li><a href="#decache">Pulling a library out of another phone's cache</a></li>
+<li><a href="#capability">Convincing the iPod it can run Siri</a></li>
+<li><a href="#speex">A microphone without Speex</a></li>
+<li><a href="#ace">Speaking Siri's protocol</a></li>
+<li><a href="#apple">Keeping Siri away from Apple</a></li>
+<li><a href="#brain">The on-device brain</a></li>
+<li><a href="#memory">256 MB, shared with Siri</a></li>
+<li><a href="#results">Results and what is left</a></li>
+</ol>
+</nav>
+
+<section>
+<h2 id="hardware">1. The hardware</h2>
+
+<div class="wide"><table>
+<thead><tr><th>Part</th><th>What it means here</th></tr></thead>
+<tbody>
+<tr><td>Apple A4: one <a href="https://en.wikipedia.org/wiki/ARM_Cortex-A8">Cortex-A8</a> core at ~1 GHz with NEON</td><td>One thread of work. NEON does 4 to 16 small multiplies per instruction, which is what makes the models usable at all.</td></tr>
+<tr><td>256 MB of RAM</td><td>About 46 MB is wired by the kernel and drivers. SpringBoard, the daemons and Siri take another ~60 MB, leaving roughly 100 to 130 MB for the models.</td></tr>
+<tr><td>Memory bandwidth: 370 MB/s (measured)</td><td>Producing one word of the answer means reading every weight once: 66 MB, so at most ~5 words per second.</td></tr>
+<tr><td>Flash: 80 MB/s read sequentially, ~6 MB/s via page faults (measured)</td><td>How a model is brought back into RAM matters more than almost anything else (§9).</td></tr>
+<tr><td>iOS 6.1.6, jailbroken</td><td>Root access, SSH, and <a href="https://iphonedev.wiki/Cydia_Substrate">Cydia Substrate</a> to patch running code.</td></tr>
+</tbody>
+</table></div>
+
+<p>Everything is cross-compiled on a Mac with the compiler from Xcode 4.6.3. It's the last Apple toolchain that still targets armv7 and iOS 6, and it runs under Rosetta.</p>
+</section>
+
+<section>
+<h2 id="anatomy">2. What Siri is made of</h2>
+
+<p>On iOS 6, Siri is several pieces that talk to each other:</p>
+
+<pre>
+ SpringBoard ──── Assistant.uibundle (the Siri screen) ── AssistantUI.framework
+      │                        │
+      │ AssistantServices      │  XPC
+      ▼                        ▼
+  assistantd  ── records audio (AVVoiceController), keeps the session ──▶  "ACE" over HTTPS
+                                                                              │
+                                                       guzzoni.apple.com  ◀───┘  (offline today)
+</pre>
+
+<p>The iPod has none of the files on disk. But every iOS device keeps its system frameworks in one big pre-linked file, the <a href="https://iphonedev.wiki/Dyld_shared_cache">dyld shared cache</a>. Comparing the iPod's cache with the iPhone 4S's turned up a surprise: <strong>the iPod already contains <code>AssistantServices</code> and <code>SAObjects</code></strong>, probably because other features share them. Every library <code>assistantd</code> links against is there too.</p>
+
+<figure class="widget wide" data-widget="inventory">
+  <figcaption><strong>Where each piece of Siri comes from.</strong> Click a piece.</figcaption>
+  <div class="sx-inv"></div>
+  <div class="sx-legend"><span style="--c: var(--sx-green)">already on the iPod</span><span style="--c: var(--sx-blue)">copied from 4S firmware</span><span style="--c: var(--sx-red)">extracted from the 4S cache</span><span style="--c: var(--sx-purple)">written for this project</span></div>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>So the shopping list is short: about 45 MB of ordinary files from the 4S's iOS 6.1.3 root filesystem, plus one binary, <code>AssistantUI</code>, that exists only inside the 4S's shared cache. The firmware is still on Apple's servers. Only the root filesystem image (925 MB) is fetched, from inside the IPSW zip, and it is decrypted with its <a href="https://theapplewiki.com/wiki/Keys:BrightonMaps_10B329_(iPhone4,1)">published key</a>.</p>
+</section>
+
+<section>
+<h2 id="decache">3. Pulling a library out of another phone's cache</h2>
+
+<p>A library inside a shared cache isn't a normal library any more. When Apple builds the cache, it lays out every framework at fixed addresses and links them to each other ahead of time. It then throws away the information a library would need to load anywhere else. Copied out naively, <code>AssistantUI</code> is full of pointers into the 4S's memory map, which means nothing on the iPod.</p>
+
+<p><a href="https://github.com/kennytm/Miscellaneous">kennytm's <code>dyld_decache</code></a> does the first part: it copies the library's segments and symbol tables back out, and copies the Objective-C selector strings it uses. At the pinned commit it wrote empty files, because a refactor had moved segment collection into a function the decacher never calls. That's a one-line fix. Even then, the result crashed the moment SpringBoard used it. <code>port/fixdylib.py</code> repairs the rest. Here is what it found:</p>
+
+<figure class="widget wide" data-widget="repair">
+  <figcaption><strong>Repairing a decached library.</strong> Each square is a pointer-sized slot in AssistantUI's data segment. The library is loaded at a different address than in the 4S cache: press "load on the iPod" to see which slots break, then apply each repair.</figcaption>
+  <div class="sx-controls">
+    <button data-act="load">load on the iPod</button>
+    <button data-fix="rebase">rebases (2,479)</button>
+    <button data-fix="bind">recovered binds (204)</button>
+    <button data-fix="lazy">eager lazy pointers (61)</button>
+    <button data-fix="stub">stubs (3)</button>
+    <button data-fix="objc">objc method lists (47)</button>
+    <button data-act="reset">reset</button>
+  </div>
+  <div class="sx-mem"></div>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Two more details mattered:</p>
+<ul>
+<li><strong>Page alignment.</strong> The decacher packs segments back to back, so the data segment's file offset wasn't a multiple of 4 KiB. dyld maps each segment with <code>mmap</code>, which requires alignment, and refused with "mmap() error 22". The tool pads the file and shifts every file offset in the load commands.</li>
+<li><strong>A 96 MB span.</strong> The code and data segments sit 96 MB apart, as they did in the cache, and code reaches data PC-relatively. So that gap has to stay, and dyld reserves the whole span. SpringBoard has the address space to spare.</li>
+</ul>
+<p>After repair, all 24 of AssistantUI's classes load with the right superclasses, every one of its 310 method implementations points into the library, and Siri's screen appears.</p>
+</section>
+
+<section>
+<h2 id="capability">4. Convincing the iPod it can run Siri</h2>
+
+<p>iOS asks <code>MobileGestalt</code>, its device-capability database, whether Siri is supported (the <code>assistant</code> key). SpringBoard also honours a hidden <code>SBAssistantCapabilityOverride</code> preference, but <code>assistantd</code> asks MobileGestalt directly. So a small Substrate tweak hooks <code>MGCopyAnswer</code> to say yes.</p>
+
+<p>The first version crashed <code>assistantd</code> with an illegal instruction. On iOS 6, <code>MGCopyAnswer</code> starts with a 4-byte Thumb-2 <code>b.w</code> that jumps to the very next instruction. Substrate copies the first instructions of a hooked function into a trampoline. It copied that PC-relative branch unchanged, so calling the original function jumped into garbage. The fix is to hook four bytes later, past the branch.<span class="sidenote-wrap"><label for="sn-2" class="sidenote-number"></label><input type="checkbox" id="sn-2" class="sidenote-toggle"><span class="sidenote"><code>MGGetBoolAnswer</code>, the usual hook target in later iOS versions, doesn't exist yet on iOS 6.</span></span></p>
+
+<p>Code patching turned out to be unavailable inside <code>assistantd</code> anyway: Substrate refuses with "process is not CS_VALID". The later fixes therefore swap Objective-C method implementations or rewrite symbol pointers in data pages, and never patch code.</p>
+</section>
+
+<section>
+<h2 id="speex">5. A microphone without Speex</h2>
+
+<p>Opening Siri now worked, but every request failed instantly with "I can't take any requests right now". The system log showed <code>mediaserverd: AudioConverterNew returned -50</code>. Siri on iOS 6 compresses your voice with the <a href="https://www.speex.org/">Speex</a> codec before sending it. The iPhone 4S's audio codecs include a Speex encoder; the iPod's don't.</p>
+
+<p>The tweak intercepts <code>-[AVVoiceController prepareRecordWithSettings:error:]</code> and asks for 16 kHz, 16-bit mono PCM instead. That alone still failed: Siri passes a sample rate of 0, meaning "the codec's default", which PCM doesn't have. With the rate forced to 16,000, recording works. In practice the iPod sometimes still records Speex, and <code>assistantd</code> labels the stream <code>Speex_WB_Quality8</code> either way. The server decides from the first packet: Speex frames are about 70 bytes, PCM buffers hundreds. It decodes Speex with the BSD-licensed reference decoder compiled in.</p>
+
+<p>There was a second, odder failure: Siri gave up because it never heard you start talking. That's correct in a silent room. For unattended tests, the tweak can report the start and end of speech itself when a test recording is present, and the server answers from that recording.</p>
+</section>
+
+<section>
+<h2 id="ace">6. Speaking Siri's protocol</h2>
+
+<p>Siri talks to its server with ACE, which the <a href="https://github.com/plamoni/SiriProxy">SiriProxy</a> community and <a href="https://github.com/janrueth/SiriServerCore">SiriServerCore</a> documented in 2011:</p>
+<ul>
+<li>an HTTP-looking request line, <code>ACE /ace HTTP/1.0</code>;</li>
+<li>then the bytes <code>AA CC EE 02</code>;</li>
+<li>then a zlib stream in each direction. It carries binary property lists ("objects", each with a class, a group, an id and a reference id), plus pings and pongs.</li>
+</ul>
+<p><code>acesrv</code> is a few hundred lines of C that implement the server side. This is a real conversation with the iPod's <code>assistantd</code>, recorded by acesrv:</p>
+
+<figure class="widget wide" data-widget="ace">
+  <figcaption><strong>One question, as Siri and acesrv see it.</strong> Step through the exchange.</figcaption>
+  <div class="sx-controls"><button data-act="next">next ▶</button><button data-act="all">show all</button><button data-act="reset">reset</button></div>
+  <div class="sx-ace"></div>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Two lessons came from the real client, both invisible to a test client:</p>
+<ul>
+<li><strong>Sync replies.</strong> Siri waits for answers to its sync commands (<code>GetAnchors</code>, <code>Chunk</code>) before it sends any speech.</li>
+<li><strong>Apple-sized timeouts.</strong> Siri's timeouts expect Apple's data centres. If no reply object arrives within seconds, it drops the connection and sends the whole request again, even while pings are being answered. Speech recognition alone takes 1.5 to 3.5 s on the iPod, and paging in the language model takes longer. So the tweak disables <code>ADAceConnection</code>'s response timers. acesrv runs the models on a worker thread, keeps answering pings, and attaches a resent request to the job already running instead of starting a second one.</li>
+</ul>
+</section>
+
+<section>
+<h2 id="apple">7. Keeping Siri away from Apple</h2>
+
+<p><code>assistantd</code> reads a <code>Server Override</code> preference, and it even accepts plain <code>http://</code> URLs ("Connecting to insecure ace server"). So no certificate has to be trusted. The first attempt, <code>http://127.0.0.1:4443</code>, was quietly rejected, though. The log said "Bad server override", and Siri connected to <code>guzzoni.apple.com</code> instead.</p>
+
+<p class="callout">That really happened during development: a handful of sessions reached Apple's server, which rejected them at session validation. The audio in those tests was silence. To make sure it can't happen again, the installer maps <code>guzzoni.apple.com</code> to 127.0.0.1 in <code>/etc/hosts</code> before anything else.</p>
+
+<p>The rule, found in the disassembly: an override's host must end in <code>apple.com</code>, or contain <code>apple.com:</code>. So the override is <code>http://guzzoni.apple.com:4443</code>, and the hosts entry sends it, and Siri's built-in fallback, to the iPod itself.</p>
+</section>
+
+<section>
+<h2 id="brain">8. The on-device brain</h2>
+
+<p><code>localsirid</code> is a daemon with both models loaded via <code>mmap</code>:</p>
+<ul>
+<li><strong>Moonshine Tiny</strong> (27M parameters, 30 MB at 8 bits) turns audio into text. It's an encoder–decoder transformer with a convolutional front end. Ported to C, its output matches the reference implementation on the test clips.</li>
+<li><strong>SmolLM2-135M-Instruct</strong> writes the answer. Its transformer layers are 4-bit and the embedding 8-bit, 98 MB in all. Only the 24,576 most common tokens are scored at each step. That halves the classifier, and the answers on a test set don't change. At 16,384 they do.</li>
+</ul>
+<p>Both run on the same NEON kernel: int8 or int4 weights times int8 activations, four rows at a time, with one float scale per 32 weights. The scales are stored in the exact order the kernel reads them, so they're used straight from the file.</p>
+
+<p>The daemon trims silence before speech recognition. Siri often keeps recording for seconds after you stop, and recognition time grows with audio length. It also skips Siri's end tone. It caches the system prompt and stops after two sentences, as Siri would.</p>
+</section>
+
+<section>
+<h2 id="memory">9. 256 MB, shared with Siri</h2>
+
+<p>On its own, with a warm cache, the brain answers in about three seconds. Inside Siri, the first version took 25 to 30 seconds: speech recognition 6.4 s and the 13-token prompt 15 s. The CPU wasn't the problem; memory was. With Siri's screen, <code>assistantd</code> and the speech synthesizer loaded, only 3 to 8 MB of RAM is free. The models no longer fit side by side, and each stage pages its model back in from flash, one 4 KiB page fault at a time.</p>
+
+<figure class="widget wide" data-widget="ram">
+  <figcaption><strong>The RAM budget during a question.</strong> Toggle the Siri UI, and how the model gets back into memory.</figcaption>
+  <div class="sx-controls">
+    <button data-k="siri" aria-pressed="true">Siri UI open</button>
+    <button data-k="prefetch" aria-pressed="true">sequential prefetch</button>
+  </div>
+  <div class="sx-bar"></div>
+  <div class="sx-scale"><span>0</span><span>64</span><span>128</span><span>192</span><span>256 MB</span></div>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Shrinking the models further would cost answer quality, and Moonshine's vocabulary can't be cut the way SmolLM2's can: its token ids aren't ordered by frequency. The fix that worked was <em>how</em> the weights come back:</p>
+<ul>
+<li><strong>Sequential reads.</strong> Reading the file with large <code>pread</code> calls fills the same page cache the mapping uses, at 80 MB/s instead of ~6 MB/s.</li>
+<li><strong>Speech model first.</strong> acesrv tells localsirid to load the speech model the moment Siri starts listening, while you're still talking.</li>
+<li><strong>Language model next.</strong> Only the parts of the LLM a forward pass touches are read, right after the transcript goes back to Siri.</li>
+</ul>
+
+<figure class="widget wide" data-widget="timeline">
+  <figcaption><strong>From the end of speech to the full answer</strong>, for "What is the capital of France?" inside Siri.</figcaption>
+  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="alone">brain alone, warm</button></div>
+  <div class="sx-tl"></div>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+</section>
+
+<section>
+<h2 id="results">10. Results and what is left</h2>
+
+<p>Hold Home and ask. Siri shows your words two to four seconds after it stops listening, and the answer arrives 10 to 20 seconds after that. Siri then speaks it with the iPod's own voice. Simple facts usually come out right. Everything else gets the confident vagueness of a 135-million-parameter model.</p>
+
+<ul>
+<li><strong>Latency</strong> is bound by RAM. A smaller language model would help in proportion to the memory it frees. Keeping the most-used layers resident is another option.</li>
+<li><strong>Siri's own end-of-speech detection</strong> often waits several seconds in a noisy room. The server trims the silence afterwards, but can't make Siri stop listening sooner.</li>
+<li>Siri's sports, maps and other skills are untouched. Every question goes to the language model.</li>
+</ul>
+
+<p>To try it yourself you need a jailbroken iPod touch 4 on iOS 6.1.6, a Mac, and Xcode 4.6.3 from Apple. Then it's two commands:</p>
+<pre>just setup ~/Downloads/xcode4630916281a.dmg
+IPOD=root@&lt;your iPod&gt; just install</pre>
+<p>See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">repository</a> for details.</p>
+
+<p class="colophon">Credits: Moonshine by Useful Sensors; SmolLM2 by Hugging Face; the ACE protocol as documented by SiriProxy and SiriServerCore; <code>dyld_decache</code> by kennytm; firmware keys from The Apple Wiki.</p>
+</section>
+
+      </div>
+    </article>
+    <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
+    <script src="assets/explainer.js" defer></script>
+  </body>
+</html>

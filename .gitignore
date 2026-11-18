@@ -1,0 +1,11 @@
+# Everything downloaded or generated: Apple firmware and binaries, models, build outputs.
+# None of it may be committed (Apple's files must stay on your machine).
+/build/
+/.toolchain/
+/.venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.bin
+*.dmg
+*.ipsw

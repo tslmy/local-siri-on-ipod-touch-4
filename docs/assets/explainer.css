@@ -1,0 +1,112 @@
+/*
+ * Figures and typography for the local-siri explainer. Scoped to .siri-explainer and built on the
+ * page frame's colour tokens (--text, --muted, --bg, --accent) from site.css.
+ */
+.siri-explainer {
+  --sx-rule: color-mix(in srgb, var(--muted) 35%, transparent);
+  --sx-panel: color-mix(in srgb, var(--text) 4%, var(--bg));
+  --sx-blue: #2f6db3;
+  --sx-red: #c0462b;
+  --sx-gold: #c88d0c;
+  --sx-green: #2e7d4f;
+  --sx-purple: #7a4fd0;
+  --sx-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sx-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  .siri-explainer { --sx-blue: #7fb0ea; --sx-red: #f08c73; --sx-gold: #f2c14e; --sx-green: #6fc28f; --sx-purple: #b49af0; }
+}
+.siri-explainer .wide { width: calc(100% / 0.6); clear: right; }
+@media (max-width: 900px) { .siri-explainer .wide { width: 100%; } }
+.siri-explainer div.wide { overflow-x: auto; }
+.siri-explainer table { border-collapse: collapse; font-size: .95rem; margin: 1rem 0; }
+.siri-explainer th, .siri-explainer td { text-align: left; padding: .3rem .8rem .3rem 0; border-bottom: 1px solid var(--sx-rule); vertical-align: top; }
+.siri-explainer td.num, .siri-explainer th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.siri-explainer pre { font: .8rem/1.35 var(--sx-mono); overflow-x: auto; padding: .6rem 0; margin: 1.2rem 0; }
+.siri-explainer code { font-family: var(--sx-mono); font-size: .88em; }
+.siri-explainer h2 { clear: both; margin-top: 2.6rem; line-height: 1.25; }
+.siri-explainer h3 { margin-top: 2rem; }
+.siri-explainer .lede { font-size: 1.2rem; color: var(--muted); }
+.siri-explainer .reading-guide { font: .9rem/1.5 var(--sx-sans); color: var(--muted); border-left: 3px solid var(--sx-gold); padding: .3rem .8rem; }
+.siri-explainer .toc ol { padding-left: 1.4rem; }
+.siri-explainer .toc h2 { margin-top: 1.5rem; font-size: 1.1rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.siri-explainer .callout { font: .95rem/1.55 var(--sx-sans); border-left: 3px solid var(--sx-red); padding: .4rem .9rem; background: var(--sx-panel); }
+
+/* Screenshots */
+.siri-explainer .shots { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin: 1.5rem 0; }
+.siri-explainer .shots figure { margin: 0; flex: 0 1 200px; text-align: center; }
+.siri-explainer .shots img { width: 100%; height: auto; border-radius: 10px; box-shadow: 0 2px 10px rgb(0 0 0 / .25); }
+.siri-explainer .shots figcaption { font: .8rem/1.4 var(--sx-sans); color: var(--muted); margin-top: .5rem; }
+
+/* Interactive figures */
+.siri-explainer figure.widget {
+  margin: 1.8rem 0; padding: 1rem 1.1rem; background: var(--sx-panel); border: 1px solid var(--sx-rule);
+  border-radius: 8px; font: .92rem/1.5 var(--sx-sans);
+}
+.siri-explainer figure.widget figcaption { margin-bottom: .8rem; color: var(--muted); }
+.siri-explainer figure.widget figcaption strong { color: var(--text); }
+.siri-explainer figure.widget button {
+  font: inherit; font-size: .85rem; padding: .25rem .7rem; margin: 0 .3rem .3rem 0; cursor: pointer;
+  background: var(--bg); color: var(--text); border: 1px solid var(--sx-rule); border-radius: 999px;
+}
+.siri-explainer figure.widget button:hover { border-color: var(--accent); }
+.siri-explainer figure.widget button[aria-pressed=true] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+.siri-explainer figure.widget input[type=range] { width: 12rem; max-width: 100%; accent-color: var(--accent); vertical-align: middle; }
+.siri-explainer .sx-controls { margin-bottom: .7rem; }
+.siri-explainer .sx-note { color: var(--muted); font-size: .85rem; margin-top: .6rem; min-height: 2.6em; }
+.siri-explainer .sx-readout { font-family: var(--sx-mono); font-size: .85rem; }
+
+/* Figure 1: inventory */
+.sx-inv { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .45rem; }
+.sx-inv button.sx-item { border-radius: 6px !important; text-align: left; margin: 0 !important; padding: .4rem .55rem !important; line-height: 1.3; }
+.sx-inv .sx-item small { display: block; color: var(--muted); font-size: .75rem; }
+.sx-item[data-src=ipod] { border-left: 5px solid var(--sx-green) !important; }
+.sx-item[data-src=file] { border-left: 5px solid var(--sx-blue) !important; }
+.sx-item[data-src=cache] { border-left: 5px solid var(--sx-red) !important; }
+.sx-item[data-src=ours] { border-left: 5px solid var(--sx-purple) !important; }
+.sx-legend { font-size: .8rem; color: var(--muted); margin-top: .6rem; }
+.sx-legend span::before { content: ''; display: inline-block; width: .7rem; height: .7rem; margin: 0 .3rem 0 .8rem; vertical-align: -1px; border-radius: 2px; background: var(--c); }
+
+/* Figure 2: pointer repair */
+.sx-mem { display: grid; grid-template-columns: repeat(16, 1fr); gap: 2px; margin: .6rem 0; }
+.sx-mem div { height: 1.6rem; border-radius: 3px; background: color-mix(in srgb, var(--muted) 25%, transparent); font: .6rem/1.6rem var(--sx-mono); text-align: center; color: var(--bg); transition: background .25s, outline-color .25s; outline: 2px solid transparent; }
+.sx-mem div.k-rebase { background: var(--sx-blue); }
+.sx-mem div.k-bind { background: var(--sx-green); }
+.sx-mem div.k-lazy { background: var(--sx-gold); }
+.sx-mem div.k-stub { background: var(--sx-purple); }
+.sx-mem div.k-objc { background: var(--sx-red); }
+.sx-mem div.broken { outline-color: var(--text); background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgb(0 0 0 / .35) 4px 6px); }
+
+/* Figure 3: ACE conversation */
+.sx-ace { display: grid; grid-template-columns: 1fr 2.2rem 1fr; gap: .25rem .4rem; align-items: center; font-size: .82rem; }
+.sx-ace .sx-hdr { font-weight: bold; color: var(--muted); text-transform: uppercase; font-size: .72rem; letter-spacing: .06em; }
+.sx-ace .msg { padding: .2rem .5rem; border-radius: 5px; background: var(--bg); border: 1px solid var(--sx-rule); font-family: var(--sx-mono); opacity: .25; transition: opacity .25s, border-color .25s; }
+.sx-ace .msg.shown { opacity: 1; }
+.sx-ace .msg.current { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sx-ace .arrow { text-align: center; color: var(--muted); opacity: .25; }
+.sx-ace .arrow.shown { opacity: 1; }
+.sx-ace .left { grid-column: 1; text-align: right; }
+.sx-ace .right { grid-column: 3; }
+
+/* Figure 4: RAM budget */
+.sx-bar { display: flex; height: 2.2rem; border-radius: 5px; overflow: hidden; margin: .5rem 0 .3rem; border: 1px solid var(--sx-rule); }
+.sx-bar div { height: 100%; font: .68rem/2.2rem var(--sx-sans); color: #fff; text-align: center; white-space: nowrap; overflow: hidden; transition: flex-basis .35s; }
+.sx-bar .over { background: repeating-linear-gradient(45deg, var(--sx-red) 0 6px, color-mix(in srgb, var(--sx-red) 60%, black) 6px 12px); }
+.sx-scale { display: flex; justify-content: space-between; font: .7rem var(--sx-mono); color: var(--muted); }
+
+/* Figure 5: timeline */
+.sx-tl { margin-top: .4rem; }
+.sx-tl .row { display: grid; grid-template-columns: 9.5rem 1fr; align-items: center; gap: .5rem; margin: .35rem 0; }
+.sx-tl .lbl { font-size: .8rem; color: var(--muted); text-align: right; }
+.sx-tl .track { display: flex; height: 1.5rem; }
+.sx-tl .seg { height: 100%; font: .66rem/1.5rem var(--sx-sans); color: #fff; text-align: center; overflow: hidden; white-space: nowrap; transition: flex-basis .4s; }
+.sx-tl .asr { background: var(--sx-blue); } .sx-tl .load { background: var(--sx-gold); } .sx-tl .prompt { background: var(--sx-purple); }
+.sx-tl .gen { background: var(--sx-green); } .sx-tl .wait { background: color-mix(in srgb, var(--muted) 60%, transparent); }
+.sx-tl .axis { display: grid; grid-template-columns: 9.5rem 1fr; gap: .5rem; font: .7rem var(--sx-mono); color: var(--muted); }
+.sx-tl .axis div:last-child { display: flex; justify-content: space-between; }
+
+@media (max-width: 600px) {
+  .siri-explainer figure.widget { padding: .8rem .7rem; margin-left: -.3rem; margin-right: -.3rem; }
+  .sx-tl .row, .sx-tl .axis { grid-template-columns: 6rem 1fr; }
+  .sx-mem { grid-template-columns: repeat(8, 1fr); }
+}
