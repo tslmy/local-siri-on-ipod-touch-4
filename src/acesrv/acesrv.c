@@ -36,6 +36,7 @@ static int cfd;
 static pthread_mutex_t send_mu = PTHREAD_MUTEX_INITIALIZER;
 static volatile int conn_gen, conn_open;
 
+static double now_s(void) { struct timeval tv; gettimeofday(&tv, 0); return tv.tv_sec + tv.tv_usec / 1e6; }
 static void logf_(const char *fmt, ...) {
     struct timeval tv; gettimeofday(&tv, 0);
     fprintf(stderr, "[acesrv %ld.%03d] ", (long)tv.tv_sec % 100000, (int)(tv.tv_usec / 1000));
@@ -130,8 +131,9 @@ static void send_simple(const char *cls, const char *group, const char *refId) {
 }
 
 /* ---------------- speech state ---------------- */
-static struct { char id[64]; int active, speex, rate, decided; void *dec; SpeexBits bits; int fsz;
-                int16_t *pcm; size_t n, cap; } sp;
+static struct { char id[64]; int active, speex, rate, wb; void *dec; SpeexBits bits; int fsz;
+                int16_t *pcm; size_t n, cap;
+                uint8_t *raw; size_t rn, rcap; size_t *plen; int np, pcap; double t0; } sp;   // raw packets until finish
 
 static void pcm_append(const int16_t *s, size_t n) {
     if (sp.n + n > sp.cap) { sp.cap = (sp.n + n) * 2 + 16000; sp.pcm = realloc(sp.pcm, sp.cap * 2); }
@@ -139,7 +141,12 @@ static void pcm_append(const int16_t *s, size_t n) {
 }
 static void speech_reset(void) {
     if (sp.dec) { speex_decoder_destroy(sp.dec); speex_bits_destroy(&sp.bits); sp.dec = NULL; }
-    sp.active = 0; sp.n = 0;
+    sp.active = 0; sp.n = 0; sp.rn = 0; sp.np = 0;
+}
+static void raw_append(const uint8_t *b, size_t n) {
+    if (sp.rn + n > sp.rcap) { sp.rcap = (sp.rn + n) * 2 + 65536; sp.raw = realloc(sp.raw, sp.rcap); }
+    if (sp.np == sp.pcap) { sp.pcap = sp.pcap * 2 + 64; sp.plen = realloc(sp.plen, sp.pcap * sizeof *sp.plen); }
+    memcpy(sp.raw + sp.rn, b, n); sp.rn += n; sp.plen[sp.np++] = n;
 }
 // Tell localsirid to load the speech model while the user is still talking.
 static void *warm_backend(void *arg) {
@@ -159,15 +166,11 @@ static void speech_start(const char *aceId, const char *codec) {
     if (pthread_create(&th, NULL, warm_backend, NULL) == 0) pthread_detach(th);
     speech_reset();
     snprintf(sp.id, sizeof sp.id, "%s", aceId);
-    sp.active = 1; sp.speex = 0; sp.rate = 16000; sp.decided = 0;
+    sp.active = 1; sp.speex = 0; sp.rate = 16000; sp.t0 = now_s();
     if (codec && strstr(codec, "Speex")) {
         sp.speex = 1;
-        int wb = strstr(codec, "WB") != NULL;
-        sp.dec = speex_decoder_init(speex_lib_get_mode(wb ? SPEEX_MODEID_WB : SPEEX_MODEID_NB));
-        int enh = 1; speex_decoder_ctl(sp.dec, SPEEX_SET_ENH, &enh);
-        speex_decoder_ctl(sp.dec, SPEEX_GET_FRAME_SIZE, &sp.fsz);
-        speex_bits_init(&sp.bits);
-        sp.rate = wb ? 16000 : 8000;
+        sp.wb = strstr(codec, "WB") != NULL;
+        sp.rate = sp.wb ? 16000 : 8000;
     } else if (codec && strstr(codec, "PCM_Mono_16Bit_")) {
         sp.rate = atoi(strstr(codec, "16Bit_") + 6);
     }
@@ -179,26 +182,32 @@ static void speech_packets(CFDictionaryRef props) {
     if (pk && CFGetTypeID(pk) == CFArrayGetTypeID()) {
         for (CFIndex i = 0; i < CFArrayGetCount(pk); i++) {
             CFDataRef d = CFArrayGetValueAtIndex(pk, i);
-            if (CFGetTypeID(d) != CFDataGetTypeID()) continue;
-            if (!sp.decided++ && sp.speex && CFDataGetLength(d) >= 320 && !(CFDataGetLength(d) & 1)) {
-                // The capability tweak asks for 16 kHz PCM, but assistantd still labels the stream
-                // Speex_WB (it maps the codec from its own settings), and sometimes the recording
-                // really is Speex. Decide from the first packet only: Speex WB frames are ~70 bytes,
-                // PCM buffers are hundreds. (Later packets can be large Speex flushes.)
-                logf_("first packet is %ld bytes: treating stream as 16 kHz PCM", (long)CFDataGetLength(d));
-                speex_decoder_destroy(sp.dec); speex_bits_destroy(&sp.bits); sp.dec = NULL;
-                sp.speex = 0; sp.rate = 16000;
-            }
-            if (sp.speex) {
-                int16_t fr[640];
-                speex_bits_read_from(&sp.bits, (char *)CFDataGetBytePtr(d), (int)CFDataGetLength(d));
-                while (speex_decode_int(sp.dec, &sp.bits, fr) == 0) pcm_append(fr, sp.fsz);
-            } else pcm_append((const int16_t *)CFDataGetBytePtr(d), CFDataGetLength(d) / 2);
+            if (CFGetTypeID(d) == CFDataGetTypeID()) raw_append(CFDataGetBytePtr(d), CFDataGetLength(d));
         }
     }
     CFTypeRef dd = dget(props, "data");
-    if (!sp.speex && dd && CFGetTypeID(dd) == CFDataGetTypeID())
-        pcm_append((const int16_t *)CFDataGetBytePtr(dd), CFDataGetLength(dd) / 2);
+    if (dd && CFGetTypeID(dd) == CFDataGetTypeID()) raw_append(CFDataGetBytePtr(dd), CFDataGetLength(dd));
+}
+
+// Decode the buffered packets. assistantd labels the stream Speex_WB whatever it records (the capability tweak
+// asks for 16 kHz PCM, and that usually but not always takes), and packet sizes don't tell them apart reliably
+// (Speex flushes several frames at once). The data rate does: PCM is 32 kB/s, Speex WB ~3.5 kB/s.
+static void speech_decode(void) {
+    double secs = now_s() - sp.t0, bps = secs > 0.3 ? sp.rn / secs : 0;
+    int speex = sp.speex && !(bps > 12000 || (bps == 0 && sp.np && sp.plen[0] >= 320));
+    logf_("speech: %zu bytes in %d packets over %.2f s (%.0f B/s) -> %s", sp.rn, sp.np, secs, bps, speex ? "Speex" : "PCM");
+    if (!speex) { pcm_append((const int16_t *)sp.raw, sp.rn / 2); sp.rate = sp.speex ? 16000 : sp.rate; return; }
+    sp.dec = speex_decoder_init(speex_lib_get_mode(sp.wb ? SPEEX_MODEID_WB : SPEEX_MODEID_NB));
+    int enh = 1; speex_decoder_ctl(sp.dec, SPEEX_SET_ENH, &enh);
+    speex_decoder_ctl(sp.dec, SPEEX_GET_FRAME_SIZE, &sp.fsz);
+    speex_bits_init(&sp.bits);
+    size_t off = 0;
+    for (int i = 0; i < sp.np; i++) {
+        int16_t fr[640];
+        speex_bits_read_from(&sp.bits, (char *)sp.raw + off, (int)sp.plen[i]);
+        while (speex_decode_int(sp.dec, &sp.bits, fr) == 0) pcm_append(fr, sp.fsz);
+        off += sp.plen[i];
+    }
 }
 
 /* ---------------- localsirid bridge ---------------- */
@@ -322,6 +331,7 @@ static void *backend_job(void *arg) {
 static void speech_finish(const char *refId) {
     if (!sp.active) return;
     sp.active = 0;
+    speech_decode();
     // resample to 16 kHz if needed (linear)
     int16_t *pcm = sp.pcm; size_t n = sp.n; int16_t *rs = NULL;
     if (sp.rate != 16000 && n) {
