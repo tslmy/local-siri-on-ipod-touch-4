@@ -55,6 +55,10 @@ smoke question="What is the capital of France?":
 ask question="What is the capital of France?":
     bash scripts/ask.sh "{{question}}"
 
+# Time the speech and chat engines on the iPod, outside Siri
+bench:
+    bash scripts/bench.sh
+
 # Show the last lines of the on-device logs
 logs:
     bash -c 'source scripts/lib.sh; on_ipod "tail -n 15 /var/root/siri/localsirid.log; echo; tail -n 15 /var/root/siri/ace/acesrv.log"'

@@ -16,4 +16,4 @@ on_ipod 'for d in /System/Library/LaunchDaemons/com.apple.assistantd.plist /Syst
     [ -f $f.bak-localsiri ] && mv $f.bak-localsiri $f
     case $f in /var/mobile/*) [ -f $f ] && chown mobile:mobile $f && chmod 600 $f;; esac; done
   killall SpringBoard
-  echo "removed; models and logs remain in /var/root/siri (delete that folder to free ~130 MB)"'
+  echo "removed; models and logs remain in /var/root/siri (delete that folder to free ~95 MB)"'

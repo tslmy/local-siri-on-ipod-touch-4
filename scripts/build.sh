@@ -22,7 +22,7 @@ for f in bits cb_search exc_10_16_table exc_10_32_table exc_20_32_table exc_5_25
          stereo vbr vq window; do SPX="$SPX $SPEEX/libspeex/$f.c"; done
 
 step "localsirid + sirictl (speech recognition and LLM daemon)"
-cc_ios -O3 -ffast-math $NEON "$S/localsirid/localsirid.c" "$S/moonshine/moonshine.c" "$S/llm/llm.c" -lm -o "$O/localsirid"
+cc_ios -O3 -ffast-math $NEON "$S/localsirid/localsirid.c" "$S/moonshine/moonshine.c" "$S/whistle/whistle.c" "$S/llm/llm.c" -lm -lpthread -o "$O/localsirid"
 cc_ios -O3 -ffast-math $NEON "$S/localsirid/sirictl.c" "$S/moonshine/moonshine.c" -lm -o "$O/sirictl"
 
 step "acesrv (on-device ACE server)"

@@ -10,7 +10,11 @@
 //   ERR\t<message>
 // Both models are mmap'd; before each stage the other model's pages are
 // dropped (MADV_DONTNEED) so they take turns in the iPod's 256 MB.
+//
+// Speech model: Whistle (<dir>/whistle.cact) when present, else Moonshine Tiny; LOCALSIRI_ASR=moonshine
+// or =whistle forces one. Chat model: argv[2], else smollm2-135m-cq4 when present, else smollm2-135m-q4e8.
 #include "../moonshine/moonshine.h"
+#include "../whistle/whistle.h"
 #include "../llm/llm.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,15 +28,17 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 #include <math.h>
+#include <sys/resource.h>
+#include <pthread.h>
 
 #define PORT 7788
 #define MAXSEQ 192
 #define MAXNEW 60
 
 static const char *SYSTEM_PROMPT =
-    "You are Siri, a helpful voice assistant on an iPod. Answer in one or two short sentences.";
+    "You are Siri, a voice assistant. Give brief, direct answers.";   // shortest answers that stayed right
 
-static moonshine_t *asr; static llm_t *lm; static int prefix_len, evict = 1, kill_voiced = 0;
+static moonshine_t *asr; static whistle_t *wsr; static llm_t *lm; static int prefix_len, evict = 1, kill_voiced = 0;
 
 static double now_ms(void) { struct timeval tv; gettimeofday(&tv, 0); return tv.tv_sec * 1e3 + tv.tv_usec / 1e3; }
 
@@ -90,12 +96,26 @@ static void save_wav(const char *path, const int16_t *pcm, uint32_t n) {
 }
 static int has_letters(const char *s) { for (; *s; s++) if ((*s | 32) >= 'a' && (*s | 32) <= 'z') return 1; return 0; }
 
+// Reading the chat model from flash is I/O and speech recognition is CPU, but overlapping them (LOCALSIRI_OVERLAP=1)
+// loses with the Siri UI open: the reads evict the speech model mid-run (encoder 0.3-1.6 s -> 3 s) and the chat
+// model's pages are gone again by the time it runs. Off by default.
+static int overlap = 0;
+static void *prefetch_llm(void *arg) { (void)arg; double t = now_ms(); llm_prefetch(lm); fprintf(stderr, "[localsirid] llm prefetch (background) %.0f ms\n", now_ms() - t); return NULL; }
+
+// Whistle sometimes wraps a transcript in quotes; drop them and surrounding spaces.
+static void tidy(char *t) {
+    int n = (int)strlen(t), a = 0;
+    while (a < n && (t[a] == ' ' || t[a] == '"')) a++;
+    while (n > a && (t[n - 1] == ' ' || t[n - 1] == '"')) n--;
+    memmove(t, t + a, n - a); t[n - a] = 0;
+}
+
 static void handle(int fd) {
     char magic[4]; uint32_t n;
     if (readn(fd, magic, 4) || readn(fd, &n, 4)) return;
     if (!memcmp(magic, "WRM1", 4)) {
         double t0 = now_ms();
-        moonshine_prefetch(asr);
+        if (wsr) whistle_prefetch(wsr); else moonshine_prefetch(asr);
         fprintf(stderr, "[localsirid] warm: speech model in %.0f ms\n", now_ms() - t0);
         write(fd, "OK\n", 3);
     } else if (!memcmp(magic, "TXT1", 4) && n < 4096) {
@@ -149,13 +169,26 @@ static void handle(int fd) {
             // Siri UI it kills Siri mid-sentence, and prefetching made it unnecessary.
             if (kill_voiced) system("/usr/bin/killall voiced 2>/dev/null");
             if (evict) llm_advise(lm, 0);
-            moonshine_prefetch(asr);   // usually already warm (WRM1 at speech start); cheap if so
             char text[1024];
-            moonshine_transcribe(asr, a, n, text, sizeof text);
+            pthread_t pf; int pf_on = 0;
+            if (wsr) {   // usually already warm (WRM1 at speech start); cheap if so
+                whistle_prefetch(wsr);
+                if (overlap) pf_on = pthread_create(&pf, NULL, prefetch_llm, NULL) == 0;
+                double tw = now_ms(), fe, en, de; int nt;
+                whistle_transcribe(wsr, a, n, text, sizeof text);
+                whistle_stats(wsr, &fe, &en, &de, &nt);
+                fprintf(stderr, "[localsirid] whistle: prefetch %.0f ms, features %.0f, encoder %.0f, decoder %.0f ms for %d tokens\n",
+                        tw - t0, fe, en - fe, de, nt);
+            } else {
+                moonshine_prefetch(asr);
+                moonshine_transcribe(asr, a, n, text, sizeof text);
+            }
+            tidy(text);
             double asr_ms = now_ms() - t0;
             sendline(fd, "HEARD", text, (int)strlen(text));   // Siri shows the words now
-            if (evict) moonshine_advise(asr, 0);
+            if (evict) { if (wsr) whistle_advise(wsr, 0); else moonshine_advise(asr, 0); }
             double tp = now_ms();
+            if (pf_on) pthread_join(pf, NULL);
             llm_prefetch(lm);          // sequential read: ~1-3 s, versus ~10 s of page faults under pressure
             fprintf(stderr, "[localsirid] llm prefetch %.0f ms\n", now_ms() - tp);
             fprintf(stderr, "[localsirid] heard %.2f s audio in %.0f ms: \"%s\"\n", n / 16000.0, asr_ms, text);
@@ -168,24 +201,37 @@ static void handle(int fd) {
 
 int main(int argc, char **argv) {
     const char *dir = argc > 1 ? argv[1] : "/var/root/siri";
-    const char *llm_name = argc > 2 ? argv[2] : "smollm2-135m-q4e8";
+    const char *llm_name = argc > 2 ? argv[2] : NULL, *asr_pick = getenv("LOCALSIRI_ASR");
     char p1[512], p2[512];
     signal(SIGPIPE, SIG_IGN);
     if (getenv("LOCALSIRI_EVICT")) evict = atoi(getenv("LOCALSIRI_EVICT"));
+    if (getenv("LOCALSIRI_OVERLAP")) overlap = atoi(getenv("LOCALSIRI_OVERLAP"));
     if (getenv("LOCALSIRI_KILL_VOICED")) kill_voiced = atoi(getenv("LOCALSIRI_KILL_VOICED"));
-    setenv("LLM_VOCAB_LIMIT", "24576", 0);   // classifier over the 24k most common tokens (see llm.c)
-    snprintf(p1, sizeof p1, "%s/moonshine-tiny.bin", dir); snprintf(p2, sizeof p2, "%s/moonshine-vocab.bin", dir);
-    asr = moonshine_load(p1, p2);
+    // Optionally run ahead of Siri's UI animation on the single core (LOCALSIRI_NICE=-10). Measured no gain.
+    if (getenv("LOCALSIRI_NICE") && setpriority(PRIO_PROCESS, 0, atoi(getenv("LOCALSIRI_NICE")))) perror("setpriority");
+    // (No LLM_VOCAB_LIMIT by default any more: cutting the classifier to the 24k lowest ids cost answers such as
+    // "Mount Everest" and "Romeo and Juliet", for ~8% of generation time.)
+    snprintf(p1, sizeof p1, "%s/whistle.cact", dir);
+    if (!(asr_pick && !strcmp(asr_pick, "moonshine")) && access(p1, R_OK) == 0) wsr = whistle_load(p1);
+    if (!wsr) {
+        snprintf(p1, sizeof p1, "%s/moonshine-tiny.bin", dir); snprintf(p2, sizeof p2, "%s/moonshine-vocab.bin", dir);
+        asr = moonshine_load(p1, p2);
+    }
+    if (!llm_name) {
+        snprintf(p1, sizeof p1, "%s/smollm2-135m-cq4.bin", dir);
+        llm_name = access(p1, R_OK) == 0 ? "smollm2-135m-cq4" : "smollm2-135m-q4e8";
+    }
     snprintf(p1, sizeof p1, "%s/%s.bin", dir, llm_name); snprintf(p2, sizeof p2, "%s/smollm2-135m.tok", dir);
     lm = llm_load(p1, p2, MAXSEQ);
-    if (!asr || !lm) { fprintf(stderr, "model load failed\n"); return 1; }
+    if ((!asr && !wsr) || !lm) { fprintf(stderr, "model load failed\n"); return 1; }
+    fprintf(stderr, "[localsirid] speech model %s, chat model %s\n", wsr ? "whistle" : "moonshine", llm_name);
     int ids[MAXSEQ];
     double t0 = now_ms();
     prefix_len = llm_chat_prefix(lm, SYSTEM_PROMPT, ids, MAXSEQ);
     llm_feed(lm, ids, prefix_len);
     double pm, gm; int pn, gn; llm_stats(lm, &pm, &pn, &gm, &gn);
     fprintf(stderr, "[localsirid] system prompt cached: %d tok in %.0f ms\n", prefix_len, now_ms() - t0);
-    moonshine_advise(asr, 0);
+    if (wsr) whistle_advise(wsr, 0); else moonshine_advise(asr, 0);
 
     int s = socket(AF_INET, SOCK_STREAM, 0), one = 1;
     setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);

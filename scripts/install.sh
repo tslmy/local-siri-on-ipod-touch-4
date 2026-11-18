@@ -33,7 +33,8 @@ COPYFILE_DISABLE=1 tar --no-xattrs -C "$STAGE" -czf "$BUILD/siri-files.tgz" .
 step "copying (models are skipped when unchanged)"
 on_ipod 'mkdir -p /var/root/siri/ace; for d in com.lmy.localsirid com.lmy.acesrv; do
   launchctl unload /Library/LaunchDaemons/$d.plist 2>/dev/null; done; true'
-for m in moonshine-tiny.bin moonshine-vocab.bin smollm2-135m-q4e8.bin smollm2-135m.tok; do
+for m in whistle.cact smollm2-135m-cq4.bin smollm2-135m.tok moonshine-tiny.bin moonshine-vocab.bin smollm2-135m-q4e8.bin; do
+  [ -f "$BUILD/models/$m" ] || continue   # the last three only with LEGACY_MODELS=1 (see models.sh)
   local_size=$(wc -c < "$BUILD/models/$m" | tr -d ' ')
   remote_size=$(on_ipod "wc -c < /var/root/siri/$m 2>/dev/null || echo 0" | tr -d ' ')
   [ "$local_size" = "$remote_size" ] || to_ipod "$BUILD/models/$m" /var/root/siri/
