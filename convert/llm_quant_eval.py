@@ -123,7 +123,7 @@ def add_act_quant(model, g=64):
         r = torch.round(r / s) * s
         return (((r @ h).reshape(sh)),)
 
-    for n, m in model.named_modules():
+    for m in model.modules():
         if isinstance(m, torch.nn.Linear):
             m.register_forward_pre_hook(pre)
 
@@ -182,10 +182,12 @@ def main():
         print(f"== {scheme}: ~{bits_of(scheme, n_emb, n_att, n_mlp):.0f} MB, perplexity {ppl:.2f}", flush=True)
         for q in QUESTIONS:
             msgs = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": q}]
-            p = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)["input_ids"]
+            p = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)[
+                "input_ids"
+            ]
             with torch.no_grad():
                 out = model.generate(p, max_new_tokens=40, do_sample=False, repetition_penalty=1.1)
-            ans = tok.decode(out[0, p.shape[1]:], skip_special_tokens=True).strip().replace("\n", " ")
+            ans = tok.decode(out[0, p.shape[1] :], skip_special_tokens=True).strip().replace("\n", " ")
             print(f"   {q} -> {ans}", flush=True)
     return 0
 

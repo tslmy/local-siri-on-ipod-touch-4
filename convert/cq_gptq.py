@@ -12,20 +12,46 @@ import torch
 import cq
 
 CALIB_QUESTIONS = [
-    "What is the largest ocean on Earth?", "Who painted the Mona Lisa?", "How many legs does a spider have?",
-    "What is the boiling point of water?", "Name a primary color.", "What language is spoken in Brazil?",
-    "How many days are in a week?", "What is the chemical symbol for gold?", "Who was the first president of "
-    "the United States?", "What do bees make?", "How many continents are there?", "What is the square root of "
-    "nine?", "What is the freezing point of water in Fahrenheit?", "Which planet is known as the red planet?",
-    "What is the longest river in Africa?", "Set an alarm for seven in the morning.", "What's the weather like "
-    "today?", "Tell me something interesting.", "How do I make a cup of tea?", "What time is it in London?",
-    "Who discovered penicillin?", "What is photosynthesis?", "How many minutes are in an hour?",
-    "Give me a fun fact about cats.", "What is the speed of light?", "Who invented the telephone?",
-    "What is the capital of Italy?", "What is the capital of Canada?", "How many centimeters are in a meter?",
-    "Why do leaves change color in autumn?", "What is a haiku?", "Recommend a good book.",
-    "How many strings does a guitar have?", "What is the opposite of hot?", "Tell me a riddle.",
-    "Spell the word necessary.", "What is ten times ten?", "Where do penguins live?",
-    "What is the smallest planet?", "How do airplanes fly?",
+    "What is the largest ocean on Earth?",
+    "Who painted the Mona Lisa?",
+    "How many legs does a spider have?",
+    "What is the boiling point of water?",
+    "Name a primary color.",
+    "What language is spoken in Brazil?",
+    "How many days are in a week?",
+    "What is the chemical symbol for gold?",
+    "Who was the first president of the United States?",
+    "What do bees make?",
+    "How many continents are there?",
+    "What is the square root of nine?",
+    "What is the freezing point of water in Fahrenheit?",
+    "Which planet is known as the red planet?",
+    "What is the longest river in Africa?",
+    "Set an alarm for seven in the morning.",
+    "What's the weather like today?",
+    "Tell me something interesting.",
+    "How do I make a cup of tea?",
+    "What time is it in London?",
+    "Who discovered penicillin?",
+    "What is photosynthesis?",
+    "How many minutes are in an hour?",
+    "Give me a fun fact about cats.",
+    "What is the speed of light?",
+    "Who invented the telephone?",
+    "What is the capital of Italy?",
+    "What is the capital of Canada?",
+    "How many centimeters are in a meter?",
+    "Why do leaves change color in autumn?",
+    "What is a haiku?",
+    "Recommend a good book.",
+    "How many strings does a guitar have?",
+    "What is the opposite of hot?",
+    "Tell me a riddle.",
+    "Spell the word necessary.",
+    "What is ten times ten?",
+    "Where do penguins live?",
+    "What is the smallest planet?",
+    "How do airplanes fly?",
 ]
 
 
@@ -33,7 +59,9 @@ def calibration(model, tok, system, max_new=40):
     seqs = []
     for q in CALIB_QUESTIONS:
         msgs = [{"role": "system", "content": system}, {"role": "user", "content": q}]
-        p = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)["input_ids"]
+        p = tok.apply_chat_template(msgs, add_generation_prompt=True, return_tensors="pt", return_dict=True)[
+            "input_ids"
+        ]
         with torch.no_grad():
             out = model.generate(p, max_new_tokens=max_new, do_sample=False, repetition_penalty=1.1)
         seqs.append(out)
@@ -70,8 +98,8 @@ def gptq_cq(w, hess, bits, g, damp=0.01):
     """w [out, in] float32 numpy, hess [in, in] (of the unrotated input) -> (idx, norms) like cq.quantize."""
     out, n = w.shape
     R = rotation(n, g)
-    W = torch.from_numpy(w).double() @ R          # rotated weights; columns are rotated coordinates
-    Hr = R @ hess @ R                             # R symmetric
+    W = torch.from_numpy(w).double() @ R  # rotated weights; columns are rotated coordinates
+    Hr = R @ hess @ R  # R symmetric
     dead = torch.diag(Hr) == 0
     Hr[dead, dead] = 1
     Hr += damp * torch.mean(torch.diag(Hr)) * torch.eye(n, dtype=torch.float64)
@@ -80,7 +108,7 @@ def gptq_cq(w, hess, bits, g, damp=0.01):
     bnd = (cb[:-1] + cb[1:]) / 2
     idx = torch.zeros(out, n, dtype=torch.uint8)
     norms = torch.zeros(out, n // g, dtype=torch.float64)
-    for i1 in range(0, n, g):                     # one block per CQ group (lazy-batch GPTQ)
+    for i1 in range(0, n, g):  # one block per CQ group (lazy-batch GPTQ)
         i2 = i1 + g
         W1, Hinv1 = W[:, i1:i2].clone(), Hinv[i1:i2, i1:i2]
         Err1 = torch.zeros_like(W1)

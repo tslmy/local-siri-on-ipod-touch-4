@@ -50,7 +50,7 @@ class Cact:
         self.hdr = hdr
         n, cb_n = hdr[1], hdr[2]
         off = struct.calcsize(HDR)
-        cb = np.frombuffer(raw[off:off + cb_n * 4], np.float32)
+        cb = np.frombuffer(raw[off : off + cb_n * 4], np.float32)
         self.cb = {2: cb[0:4], 3: cb[4:12], 4: cb[12:28]}
         off += cb_n * 4
         self.recs = []
@@ -66,7 +66,7 @@ class Cact:
         dtype, ndim, _, *rest = self.recs[i]
         shape = tuple(rest[:ndim])
         offset, nbytes, group, bits = rest[4:8]
-        blob = self.raw[offset:offset + nbytes]
+        blob = self.raw[offset : offset + nbytes]
         if dtype == FP16:
             t = np.frombuffer(blob, np.float16).reshape(shape).astype(np.float32)
         elif dtype == FP32:
@@ -94,9 +94,25 @@ def load(path):
     c = Cact(path)
     h = c.hdr
     L, taps = h[10], h[19]
-    m = {"vocab": h[5], "dim": h[7], "heads": h[8], "kv": h[9], "layers": L, "qk": h[11], "v": h[12],
-         "lanes": h[15], "taps": taps, "slots": h[20], "sub": h[21], "tables": h[22], "etaps": h[23],
-         "edil": h[24], "orders": list(h[27:27 + h[26]]), "sites": list(h[32:32 + h[31]]), "rope": h[48]}
+    m = {
+        "vocab": h[5],
+        "dim": h[7],
+        "heads": h[8],
+        "kv": h[9],
+        "layers": L,
+        "qk": h[11],
+        "v": h[12],
+        "lanes": h[15],
+        "taps": taps,
+        "slots": h[20],
+        "sub": h[21],
+        "tables": h[22],
+        "etaps": h[23],
+        "edil": h[24],
+        "orders": list(h[27 : 27 + h[26]]),
+        "sites": list(h[32 : 32 + h[31]]),
+        "rope": h[48],
+    }
     m["embedding"] = c.take()
     hada = ("d1", "d2", "b2", "d3", "d4", "w1a", "w1b", "w2a", "w2b", "w3a", "w3b", "cond_v", "cond_u")
     dec = []
@@ -104,8 +120,15 @@ def load(path):
         d = {"norm_in": c.take(), "q": c.take(), "k": c.take(), "v": c.take()}
         if taps:
             d.update(q_taps=c.take(), k_taps=c.take(), v_taps=c.take())
-        d.update(q_norm=c.take(), k_norm=c.take(), gate=c.take(), out=c.take(), post_norm=c.take(),
-                 attn_gate=c.take(), pre_hada=c.take())
+        d.update(
+            q_norm=c.take(),
+            k_norm=c.take(),
+            gate=c.take(),
+            out=c.take(),
+            post_norm=c.take(),
+            attn_gate=c.take(),
+            pre_hada=c.take(),
+        )
         d["mlp"] = {k: c.take() for k in hada}
         dec.append(d)
     m["dec"] = dec
@@ -116,8 +139,26 @@ def load(path):
     m["final_norm"] = c.take()
     man = c.take()
     assert man[0] == 3246.0, "no audio manifest (heads present?)"
-    a = dict(zip(("ver", "text", "enc_layers", "enc_lanes", "conv_kernel", "stem", "stem_stages", "mels", "rate",
-                  "fft", "win", "hop"), [int(v) for v in man[1:]]))
+    a = dict(
+        zip(
+            (
+                "ver",
+                "text",
+                "enc_layers",
+                "enc_lanes",
+                "conv_kernel",
+                "stem",
+                "stem_stages",
+                "mels",
+                "rate",
+                "fft",
+                "win",
+                "hop",
+            ),
+            [int(v) for v in man[1:]],
+            strict=False,
+        )
+    )
     m["audio"] = a
     for d in dec:
         d["cross_norm"] = c.take()
@@ -126,8 +167,7 @@ def load(path):
     m["pe_gate"] = c.take()
     enc = []
     for _ in range(a["enc_layers"]):
-        e = {k: c.take() for k in ("pre_hada_norm_0", "norm_in", "post_norm", "conv_norm", "conv_out_norm",
-                                    "pre_hada")}
+        e = {k: c.take() for k in ("pre_hada_norm_0", "norm_in", "post_norm", "conv_norm", "conv_out_norm", "pre_hada")}
         e["q"], e["k"], e["v"], e["gate"], e["out"] = (c.take() for _ in range(5))
         e.update(q_norm=c.take(), k_norm=c.take(), attn_gate=c.take(), pw1=c.take(), pw2=c.take(), dw=c.take())
         e["mlp0"] = {k: c.take() for k in hada}
@@ -165,7 +205,7 @@ def tokenizer_pieces(blob):
     for _ in range(n):
         _, t, ln = struct.unpack_from("<fBH", blob, off)
         off += 7
-        pieces.append(blob[off:off + ln].decode("utf-8"))
+        pieces.append(blob[off : off + ln].decode("utf-8"))
         types.append(t)
         off += ln
     return pieces, types
@@ -185,6 +225,7 @@ def detok(blob, ids):
 
 
 # ---- layers ----------------------------------------------------------------------------------------------------
+
 
 def sigmoid(x):
     return 1 / (1 + np.exp(-x))
@@ -308,16 +349,17 @@ def lane_stack(x, hc, L, n, block, final_norm):
 
 # ---- audio front end and encoder ---------------------------------------------------------------------------------
 
+
 def features(m, wav):
     a = m["audio"]
     win, hop, fft = a["win"], a["hop"], a["fft"]
     w = np.hanning(win).astype(np.float32)
     x = np.pad(wav.astype(np.float32), (win // 2, win // 2))
     nfr = (len(x) - win) // hop + 1
-    frames = np.stack([x[i * hop:i * hop + win] * w for i in range(nfr)])
+    frames = np.stack([x[i * hop : i * hop + win] * w for i in range(nfr)])
     spec = np.fft.rfft(frames, n=fft)
     power = np.abs(spec) ** 2
-    feat = np.log(power @ m["mel"] + 2.0 ** -24)
+    feat = np.log(power @ m["mel"] + 2.0**-24)
     n = len(wav) // hop
     feat = feat[:n] if n <= len(feat) else feat
     mean = feat.mean(0, keepdims=True)
@@ -333,7 +375,7 @@ def dwconv2d_s2(x, w):
     out = np.zeros((Ho, Wo, w.shape[1]), np.float32)
     for dy in range(3):
         for dx in range(3):
-            out += w[dy * 3 + dx] * xp[dy:dy + 2 * Ho:2, dx:dx + 2 * Wo:2]
+            out += w[dy * 3 + dx] * xp[dy : dy + 2 * Ho : 2, dx : dx + 2 * Wo : 2]
     return out
 
 
@@ -367,7 +409,7 @@ def encode(m, wav):
         h = h[:, :D] * sigmoid(h[:, D:]) * seen[:, None]
         K = e["dw"].shape[0]
         hp = np.pad(h, ((K // 2, K // 2), (0, 0)))
-        h = sum(e["dw"][k] * hp[k:k + T] for k in range(K))
+        h = sum(e["dw"][k] * hp[k : k + T] for k in range(K))
         h = silu(zcnorm(h, e["conv_out_norm"]))
         x = x + h @ e["pw2"].T
         return x + 0.5 * hadamard_mlp(zcnorm(x, e["pre_hada"]), e["mlp"], m["p1"], m["p2"])
@@ -390,7 +432,7 @@ def engram_indices(tokens, orders, heads, slots):
             acc = np.full_like(u, seed)
             for j in range(order):
                 sh = np.zeros_like(u)
-                sh[j:] = u[:len(u) - j]
+                sh[j:] = u[: len(u) - j]
                 acc = ((acc ^ sh) * PRIME) & 0xFFFFFFFF
             acc = acc ^ (acc >> 15)
             idx.append(acc % slots)
