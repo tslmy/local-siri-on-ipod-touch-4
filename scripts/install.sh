@@ -48,7 +48,11 @@ to_ipod "$BUILD/siri-files.tgz" /var/root/
 
 step "installing Siri files and configuring"
 on_ipod 'set -e
-  tar -C / -xzf /var/root/siri-files.tgz --no-same-owner && rm /var/root/siri-files.tgz
+  # Jailbreaks move /Applications (and parts of /Library, /usr) to /var/stash and leave symlinks.
+  # By default GNU tar replaces such a symlink with an empty directory when the archive has an entry
+  # for it, which hides every app from SpringBoard; keep the symlinks and existing directories as they are.
+  tar -C / -xzf /var/root/siri-files.tgz --no-same-owner --keep-directory-symlink --no-overwrite-dir
+  rm /var/root/siri-files.tgz
   chown -R root:wheel /System/Library/PrivateFrameworks/Assistant*.framework /System/Library/PrivateFrameworks/SAObjects.framework \
     /System/Library/SpringBoardPlugins/Assistant.uibundle /System/Library/Assistant /System/Library/PreferenceBundles/Assistant.bundle \
     /System/Library/UserEventPlugins/AssistantUEA.plugin /System/Library/LaunchDaemons/com.apple.assistant*.plist
