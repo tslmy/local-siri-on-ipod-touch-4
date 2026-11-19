@@ -17,6 +17,8 @@
 #include "../whistle/whistle.h"
 #include "../llm/llm.h"
 #include <stdio.h>
+#include <time.h>
+#include <sys/stat.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
@@ -126,6 +128,12 @@ static void handle(int fd) {
         int16_t *pcm = malloc(n * 2); float *a = malloc(n * 4);
         if (readn(fd, pcm, n * 2) == 0) {
             save_wav("/var/root/siri/last.wav", pcm, n);
+            {   // keep the last 20 recordings (by mtime) for comparing speech engines on real voices
+                static int ring = -1; char path[64];
+                if (ring < 0) { mkdir("/var/root/siri/heard", 0755); ring = (int)(time(NULL) % 20); }
+                snprintf(path, sizeof path, "/var/root/siri/heard/%02d.wav", ring); ring = (ring + 1) % 20;
+                save_wav(path, pcm, n);
+            }
             // Level check, gain and trimming, on 100 ms windows (50 ms hop). Siri's end tone lands in
             // the last ~100 ms (a loud click), so drop that first.
             double peak = 0;
@@ -141,8 +149,9 @@ static void handle(int fd) {
             double best = nw ? srt[nw - 1] : 0, floor_ = nw ? srt[nw / 5] : 0;   // loudest window; noise floor (20th percentile)
             fprintf(stderr, "[localsirid] audio %.2f s, peak %.3f, loudest-100ms rms %.4f, floor %.5f\n", n / 16000.0, peak, best, floor_);
             // Speech must stand out from the room noise. Siri's speech-recognition audio mode is
-            // quiet on the iPod (normal speech at arm's length is often -50 dBFS), so no fixed level.
-            if (best < 0.001 || best < floor_ * 6) {
+            // quiet on the iPod: a voice aimed at the front lands near -60 dBFS, only 5-10x the
+            // noise floor (silence measures ~1.5x), so no fixed level.
+            if (best < 0.0005 || best < floor_ * 3) {
                 sendline(fd, "HEARD", "", 0); write(fd, "DONE\t0\t0\t0\t0\n", 13);
                 free(r); free(srt); free(pcm); free(a); return;
             }
@@ -154,11 +163,11 @@ static void handle(int fd) {
                 floor_ *= g;
                 fprintf(stderr, "[localsirid] gain %.1f dB\n", 20 * log10(g));
             }
-            // Trim silence: Siri's endpointer often keeps recording for seconds after you stop, and
-            // speech recognition time grows with audio length. Keep the span of windows louder than
-            // 8x the noise floor, padded by 300 ms.
+            // Trim silence: speech recognition time grows with audio length. Keep the span of windows
+            // louder than 3x the noise floor and 5% of the loudest one, padded by 300 ms. (A threshold
+            // of 8x the floor cut quiet voices down to a single word.)
             {
-                double thr = floor_ * 8 > 0.004 ? floor_ * 8 : 0.004;
+                double thr = floor_ * 3 > best * (g > 1 ? g : 1) * 0.05 ? floor_ * 3 : best * (g > 1 ? g : 1) * 0.05;   // g is applied only when > 1
                 long first = -1, last = -1;
                 for (int k = 0; k < nw; k++) if (r[k] > thr) { if (first < 0) first = k * 800L; last = k * 800L + 1600; }
                 if (first >= 0) {

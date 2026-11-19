@@ -37,7 +37,7 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 | Answer, generation | 2–2.5 tokens/s with the Siri UI open; 3.8 tokens/s alone |
 | Total, from when Siri stops listening to the full answer | about 15–20 s for a one-sentence answer |
 | Answer quality | What a 135M model can do: in live tests "Paris", "Tokyo", "Shakespeare", "Everest" and the Moon's distance were right; "ounces in a pound" still isn't |
-| Quiet voices | The microphone is quiet in Siri's recording mode, so hold the iPod close and speak up. With the Mac's voice played 22 dB quieter, 2 of 3 questions were heard right; at 26 dB quieter, none. If nothing is heard, Siri says "Sorry, I didn't catch that." |
+| Quiet voices | The iPod's only microphone is on the back, beside the rear camera, and Siri's recording mode is quiet. A voice aimed at the screen reaches it at only 5–10x the room noise. In one round of six real-voice questions, Whistle got 2 right (Moonshine none); the Mac's louder voice is right most of the time. Tilting the top edge toward your mouth helps. If nothing is heard, Siri says "Sorry, I didn't catch that." |
 | Physical Home-button hold | Should behave like Activator's Siri action, which is what was tested; not pressed by hand yet |
 
 ## What you need
