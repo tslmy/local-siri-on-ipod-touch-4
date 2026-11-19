@@ -11,14 +11,14 @@
       ['ipod', 'AssistantServices.framework', 'binary in the iPod\'s cache', 'Already in the iPod\'s dyld shared cache: the client side of Siri that SpringBoard and Settings use to talk to assistantd. Only its resource files (Info.plist, strings) are missing.'],
       ['ipod', 'SAObjects.framework', 'binary in the iPod\'s cache', 'The Objective-C classes for every ACE object (SASpeechRecognized, SAUIAddViews, ...). Also already in the iPod\'s cache.'],
       ['ipod', 'VoiceServices / voiced', 'speech synthesis', 'Siri speaks with the same text-to-speech engine VoiceOver uses, which every iPod has.'],
-      ['ipod', 'AVVoiceController', 'recording', 'Records and endpoints your voice. Present, but the iPod has no Speex encoder, see section 5.'],
+      ['ipod', 'AVVoiceController', 'recording', 'Records your voice and decides when you have stopped talking. Present, but tuned for the 4S: see section 5.'],
       ['ipod', 'MobileGestalt', 'says "no Siri here"', 'The capability database. It answers false for the "assistant" key, so the tweak hooks it (section 4).'],
       ['file', 'assistantd', 'the Siri daemon', 'A normal executable in AssistantServices.framework on the 4S. It records audio, keeps the ACE session with the server, and relays results to SpringBoard. All 35 libraries it links are on the iPod.'],
       ['file', 'Assistant.uibundle', 'SpringBoard plugin', 'The Siri screen itself: the paper-texture bubbles, the glowing microphone. A loadable bundle, not in the cache.'],
       ['file', '/System/Library/Assistant', 'UI plugins', 'Snippet plugins for maps, weather, stocks, reminders and so on. They load, but this project never sends their objects.'],
       ['file', 'Settings, LaunchDaemons', 'and resources', 'Siri\'s page in Settings, the launchd jobs for assistantd and assistant_service, and the frameworks\' resource folders: about 45 MB in all.'],
       ['cache', 'AssistantUI.framework', '137 KB, repaired', 'The only binary that exists solely inside the 4S\'s shared cache. Extracting it and making it load elsewhere is section 3.'],
-      ['ours', 'SiriCapability tweak', 'Substrate', 'Says yes to the capability check, records PCM instead of Speex, and disables timeouts sized for Apple\'s servers.'],
+      ['ours', 'SiriCapability tweak', 'Substrate', 'Says yes to the capability check, makes recording work without a Speex encoder, replaces the end-of-speech detection, and disables timeouts sized for Apple\'s servers.'],
       ['ours', 'acesrv', 'ACE server', 'Stands in for guzzoni.apple.com on 127.0.0.1:4443 (section 6).'],
       ['ours', 'localsirid', 'speech + LLM', 'Whistle and SmolLM2-135M in C and NEON (section 8).'],
       ['ours', '/etc/hosts entry', 'guzzoni.apple.com → 127.0.0.1', 'Makes sure Siri can only ever reach the iPod itself (section 7).'],
@@ -77,10 +77,10 @@
       ['c', 'GetAnchors', 'Siri wants to sync contacts, apps and so on, and won\'t send any speech until this is answered.'],
       ['s', 'GetAnchorsResponse (no anchors)', 'acesrv keeps no synced data, so it reports none.'],
       ['c', 'StartSpeechRequest  Speex_WB_Quality8', 'Siri heard you start talking. acesrv tells localsirid to read the speech model into RAM now, while you are still speaking.'],
-      ['c', 'SpeechPacket × 12', 'Your voice: PCM or Speex, whatever the label says. acesrv decides from the size of the first packet.'],
+      ['c', 'SpeechPacket × 12', 'Your voice: PCM or Speex, whatever the label says. acesrv tells them apart by data rate.'],
       ['c', 'Chunk', 'A sync chunk arrives in the middle of the speech.'],
       ['s', 'ChunkAccepted', 'acesrv accepts every chunk, echoing its new generation.'],
-      ['c', 'FinishSpeech', 'Siri\'s endpointer decided you stopped. Audio goes to localsirid on a worker thread; the main loop keeps answering pings.'],
+      ['c', 'FinishSpeech', 'The tweak\'s end-of-speech detection decided you stopped. Audio goes to localsirid on a worker thread; the main loop keeps answering pings.'],
       ['s', 'SpeechRecognized  "What is the capital of France?"', 'Sent as soon as speech recognition finishes, about 3 s later, so your words appear while the language model works.'],
       ['s', 'AddViews  AssistantUtteranceView  "The capital of France is Paris."', 'The answer, with speakableText, so Siri also reads it aloud.'],
       ['s', 'RequestCompleted', 'Done. Siri plays its end tone and speaks.'],
@@ -166,6 +166,146 @@
     draw('before');
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline };
+  // Walsh–Hadamard helpers (unnormalized ±1 entries; divide by √n where it matters)
+  const hadamard = (n) => {
+    let h = [[1]];
+    while (h.length < n) h = [...h.map((r) => [...r, ...r]), ...h.map((r) => [...r, ...r.map((v) => -v)])];
+    return h;
+  };
+  const rotate = (v) => { const n = v.length, h = hadamard(n), s = Math.sqrt(n); return h.map((row) => row.reduce((a, x, j) => a + x * v[j], 0) / s); };
+
+  // 6. Building a Walsh–Hadamard matrix by doubling
+  const hadamardFig = (fig) => {
+    const box = $(fig, '.sx-had'), note = $(fig, '.sx-note'), buttons = [...fig.querySelectorAll('button')];
+    const draw = (n) => {
+      const h = hadamard(n), grid = el('div', 'grid');
+      grid.style.gridTemplateColumns = `repeat(${n}, 1fr)`;
+      grid.style.maxWidth = `${Math.min(26, n * 2.4)}rem`;
+      h.forEach((row, i) => row.forEach((v, j) => {
+        const c = el('div', v > 0 ? 'p' : 'm', n <= 8 ? (v > 0 ? '+' : '−') : '');
+        if (n > 2 && i >= n / 2 && j >= n / 2) c.classList.add('neg');   // the negated copy
+        c.dataset.row = i;
+        c.addEventListener('click', () => {
+          grid.classList.add('picked');
+          grid.querySelectorAll('div').forEach((d) => d.classList.toggle('sel', d.dataset.row === String(i)));
+          const terms = row.map((x, k) => `${x > 0 ? (k ? ' + ' : '') : (k ? ' − ' : '−')}x${k + 1}`).join('');
+          const flips = row.slice(1).reduce((a, x, k) => a + (x !== row[k] ? 1 : 0), 0);
+          note.textContent = `Output ${i + 1} = (${terms}) / √${n}. Every input counts equally, only the signs differ. The sign flips ${flips} times along this row: rows are like square waves of different frequencies, and any two rows agree in exactly half their places, which is what makes them orthogonal.`;
+        });
+        grid.append(c);
+      }));
+      box.replaceChildren(grid);
+      note.textContent = n === 2
+        ? 'The 2×2 matrix: output 1 is the sum of the two inputs, output 2 their difference (each divided by √2).'
+        : `${n}×${n}: four copies of the ${n / 2}×${n / 2} matrix, the bottom-right one (outlined) with its signs flipped. Click a row.`;
+    };
+    buttons.forEach((b) => b.addEventListener('click', () => { press(buttons, b); draw(+b.dataset.n); }));
+    draw(16);
+  };
+
+  // 7. Quantizing one group: evenly spaced levels vs rotation + Gaussian codebook
+  const cqFig = (fig) => {
+    const G = 32, SIGMA = 0.02;   // group size shown; weight scale
+    const CB = {   // Lloyd–Max levels for a unit Gaussian, as in Whistle and convert/cq.py
+      2: [-1.507, -0.451, 0.453, 1.51],
+      4: [-2.71, -2.044, -1.595, -1.233, -0.922, -0.64, -0.373, -0.114, 0.144, 0.404, 0.673, 0.961, 1.276, 1.637, 2.084, 2.741],
+    };
+    const state = { rotate: true, codebook: true, heavy: true, bits4: false };
+    const rng = (seed) => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = (r) => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    // heavy tails: Student's t with 3 degrees of freedom, a common model for weights with outliers
+    const sample = (r) => state.heavy ? gauss(r) / Math.sqrt((gauss(r) ** 2 + gauss(r) ** 2 + gauss(r) ** 2) / 3) : gauss(r);
+    const group = (r) => Array.from({ length: G }, () => sample(r) * SIGMA);
+    const norm = (v) => Math.sqrt(v.reduce((a, x) => a + x * x, 0));
+    const nearest = (levels, x) => levels.reduce((b, l) => (Math.abs(l - x) < Math.abs(b - x) ? l : b), levels[0]);
+    // Quantize one group with the current settings. Returns display values (in level units), the levels,
+    // and the error after decoding, relative to the group's own size (rms).
+    const quant = (w) => {
+      const bits = state.bits4 ? 4 : 2, n = 1 << bits, v = state.rotate ? rotate(w) : w;
+      let s, levels;
+      if (state.codebook) { s = norm(v) / Math.sqrt(G); levels = CB[bits]; }          // length-scaled Gaussian codebook
+      else {                                                                          // evenly spaced up to the largest value
+        const m = Math.max(...v.map(Math.abs)); s = m / 3;
+        levels = Array.from({ length: n }, (_, k) => (-m + (2 * m / n) * (k + 0.5)) / s);
+      }
+      const shown = v.map((x) => x / s), q = shown.map((x) => nearest(levels, x) * s);
+      const back = state.rotate ? rotate(q) : q;                                      // the rotation is its own inverse
+      const err = norm(w.map((x, i) => x - back[i])) / norm(w);
+      return { shown, levels, err, n };
+    };
+    let seed = 11;
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const draw = () => {
+      const w = group(rng(seed)), { shown, levels, err, n } = quant(w);
+      const r = rng(4242); let avg = 0; for (let i = 0; i < 500; i++) avg += quant(group(r)).err / 500;
+      const big = w.reduce((b, x, i) => (Math.abs(x) > Math.abs(w[b]) ? i : b), 0);
+      const R = Math.max(1.6, ...shown.map(Math.abs), ...levels.map(Math.abs)) * 1.08, X = (x) => 20 + ((x + R) / (2 * R)) * 600;
+      const kids = [mk('line', { x1: 20, x2: 620, y1: 112, y2: 112, class: 'axis' })];
+      levels.forEach((l) => kids.push(mk('line', { x1: X(l), x2: X(l), y1: 104, y2: 120, class: 'level' })));
+      shown.forEach((x, i) => {
+        const y = 18 + (i % 6) * 13;
+        kids.push(mk('line', { x1: X(x), x2: X(nearest(levels, x)), y1: y, y2: 104, class: 'snap' }));
+        kids.push(mk('circle', { cx: X(x), cy: y, r: 4, class: !state.rotate && i === big ? 'dot out' : 'dot' }));
+      });
+      const t = mk('text', { x: 20, y: 142, class: 'lbl' }); t.textContent = `${n} levels`; kids.push(t);
+      svg.replaceChildren(...kids);
+      const used = new Set(shown.map((x) => nearest(levels, x))).size;
+      note.textContent = `${state.rotate ? 'Rotated' : 'Raw'} weights, ${state.codebook ? 'Gaussian codebook' : 'evenly spaced levels'}, ${state.bits4 ? 4 : 2} bits: these ${G} values use ${used} of ${n} levels. `
+        + `Error after decoding: ${(err * 100).toFixed(0)}% of the group's size here, ${(avg * 100).toFixed(0)}% on average over 500 random groups.`
+        + (!state.rotate && !state.codebook ? ' The largest weight (red) sets the spacing, so the ordinary weights share very few levels.' : '')
+        + (state.rotate && state.codebook ? ' This is the combination the iPod runs.' : '');
+    };
+    fig.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'new') seed = (seed * 48271) % 2147483647;
+      else { state[b.dataset.k] = !state[b.dataset.k]; b.setAttribute('aria-pressed', String(state[b.dataset.k])); }
+      draw();
+    }));
+    draw();
+  };
+
+  // 8. The fast Walsh–Hadamard transform, round by round
+  const fwhtFig = (fig) => {
+    const x0 = [3, 1, -2, 4, 0, 2, 1, -1], N = x0.length, ROUNDS = Math.log2(N);
+    const stages = [x0.slice()];
+    for (let r = 0, h = 1; r < ROUNDS; r++, h *= 2) {
+      const p = stages[r], v = p.slice();
+      for (let i = 0; i < N; i += 2 * h) for (let j = i; j < i + h; j++) { v[j] = p[j] + p[j + h]; v[j + h] = p[j] - p[j + h]; }
+      stages.push(v);
+    }
+    const box = $(fig, '.sx-fwht'), note = $(fig, '.sx-note');
+    let k = 0;
+    const draw = () => {
+      const t = el('table');
+      const hr = el('tr'); hr.append(el('th', null, 'input'));
+      for (let r = 1; r <= ROUNDS; r++) hr.append(el('th', null, `round ${r}`));
+      hr.append(el('th', null, `÷ √${N}`)); t.append(hr);
+      const h = k ? 1 << (k - 1) : 0;
+      for (let i = 0; i < N; i++) {
+        const tr = el('tr'); tr.append(el('td', 'num', String(x0[i])));
+        for (let r = 1; r <= ROUNDS; r++) {
+          const td = el('td', 'num', r <= k ? String(stages[r][i]) : '');
+          if (r === k) td.classList.add(Math.floor(i / h) % 2 ? 'b' : 'a');
+          tr.append(td);
+        }
+        tr.append(el('td', 'num', k === ROUNDS ? (stages[ROUNDS][i] / Math.sqrt(N)).toFixed(2) : ''));
+        t.append(tr);
+      }
+      box.replaceChildren(t);
+      note.textContent = k === 0
+        ? `${N} activations. Multiplying by the 8×8 matrix directly would take 64 multiply-adds.`
+        : k < ROUNDS
+          ? `Round ${k}: pairs ${h} apart are combined. Blue rows got a + b, gold rows a − b.`
+          : `Done after ${ROUNDS} rounds of ${N} additions or subtractions (${ROUNDS * N} in all, no multiplications), then one scaling. For a group of 64 it's 6 rounds: 384 operations instead of 4,096.`;
+    };
+    fig.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.act === 'next') k = k >= ROUNDS ? 0 : k + 1;
+      if (b.dataset.act === 'reset') k = 0;
+      draw();
+    }));
+    draw();
+  };
+
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, fwht: fwhtFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();

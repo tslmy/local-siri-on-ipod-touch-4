@@ -105,6 +105,30 @@
 .sx-tl .axis { display: grid; grid-template-columns: 9.5rem 1fr; gap: .5rem; font: .7rem var(--sx-mono); color: var(--muted); }
 .sx-tl .axis div:last-child { display: flex; justify-content: space-between; }
 
+/* Figure 6: Walsh–Hadamard matrix */
+.sx-had .grid { display: grid; gap: 2px; max-width: 26rem; margin: .3rem auto; }
+.sx-had .grid div { aspect-ratio: 1; border-radius: 2px; font: .75rem/1 var(--sx-mono); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: opacity .2s; }
+.sx-had .grid .p { background: var(--sx-blue); }
+.sx-had .grid .m { background: var(--sx-red); }
+.sx-had .grid .neg { outline: 1px solid var(--text); outline-offset: -1px; }
+.sx-had .grid.picked div:not(.sel) { opacity: .3; }
+
+/* Figure 7: quantizing a group */
+.sx-cq { width: 100%; height: auto; display: block; }
+.sx-cq .axis { stroke: var(--muted); stroke-width: 1; }
+.sx-cq .level { stroke: var(--text); stroke-width: 2; }
+.sx-cq .snap { stroke: var(--sx-gold); stroke-width: 1; opacity: .7; }
+.sx-cq .dot { fill: var(--sx-blue); }
+.sx-cq .dot.out { fill: var(--sx-red); }
+.sx-cq .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+
+/* Figure 8: fast transform */
+.sx-fwht table { margin: .2rem auto; font: .85rem var(--sx-mono); }
+.sx-fwht th { font: .72rem var(--sx-sans); color: var(--muted); text-align: right; padding: .2rem .7rem; }
+.sx-fwht td { padding: .15rem .7rem; text-align: right; min-width: 2.5rem; }
+.sx-fwht td.a { color: var(--sx-blue); font-weight: bold; }
+.sx-fwht td.b { color: var(--sx-gold); font-weight: bold; }
+
 @media (max-width: 600px) {
   .siri-explainer figure.widget { padding: .8rem .7rem; margin-left: -.3rem; margin-right: -.3rem; }
   .sx-tl .row, .sx-tl .axis { grid-template-columns: 6rem 1fr; }
