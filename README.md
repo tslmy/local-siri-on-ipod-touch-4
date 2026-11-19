@@ -23,7 +23,7 @@ Hold Home ─▶ SpringBoard's Siri UI (iPhone 4S files) ─▶ assistantd ─�
   - [Whistle](https://huggingface.co/Cactus-Compute/whistle) by Cactus Compute for speech recognition. The published 16.9 MB file runs as is; its 2- and 4-bit weights never get unpacked.
   - [SmolLM2-135M-Instruct](https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct) for the answer, stored in the same 4-bit codebook format as Whistle (76 MB). Each weight's rounding is chosen GPTQ-style.
   - [Moonshine Tiny](https://huggingface.co/UsefulSensors/moonshine-tiny) is still supported as a fallback (`LEGACY_MODELS=1 just models`).
-- **A tweak** (`SiriCapability`) makes the iPod report the Siri capability. It also switches Siri to recording plain PCM, because the iPod has no Speex encoder, and disables response timeouts that were sized for Apple's servers.
+- **A tweak** (`SiriCapability`) makes the iPod report the Siri capability. It also switches Siri to recording plain PCM, because the iPod has no Speex encoder, and disables response timeouts that were sized for Apple's servers. And it replaces Siri's end-of-speech detection: the iPod's microphone is about 15 dB quieter in Siri's recording mode than normal, which made Siri stop listening before you'd spoken.
 
 ## Status
 
@@ -37,6 +37,7 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 | Answer, generation | 2–2.5 tokens/s with the Siri UI open; 3.8 tokens/s alone |
 | Total, from when Siri stops listening to the full answer | about 15–20 s for a one-sentence answer |
 | Answer quality | What a 135M model can do: in live tests "Paris", "Tokyo", "Shakespeare", "Everest" and the Moon's distance were right; "ounces in a pound" still isn't |
+| Quiet voices | The microphone is quiet in Siri's recording mode, so hold the iPod close and speak up. With the Mac's voice played 22 dB quieter, 2 of 3 questions were heard right; at 26 dB quieter, none. If nothing is heard, Siri says "Sorry, I didn't catch that." |
 | Physical Home-button hold | Should behave like Activator's Siri action, which is what was tested; not pressed by hand yet |
 
 ## What you need

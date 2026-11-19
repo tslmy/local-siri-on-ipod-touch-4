@@ -5,14 +5,17 @@
 //     (assistantd still labels the stream Speex_WB; acesrv tells them apart by packet size).
 //  3. assistantd: disable ADAceConnection's response timeouts, which are sized for Apple's servers;
 //     an on-device answer takes longer, and assistantd would drop the loopback connection.
-//  4. Test hook: while /tmp/acesrv-test.wav exists, fake Siri's start/end-of-speech detection.
-//  5. Debug: if /tmp/siri-debug exists, copy assistantd's own log (all levels) to /tmp/assistantd.log.
+//  4. assistantd: replace Siri's endpointer, which the iPod's quiet microphone confuses, with one
+//     relative to the measured noise floor, and raise the level meter (see "Endpointer").
+//  5. Test hook: while /tmp/acesrv-test.wav exists, fake Siri's start/end-of-speech detection.
+//  6. Debug: if /tmp/siri-debug exists, copy assistantd's own log (all levels) to /tmp/assistantd.log.
 #include <CoreFoundation/CoreFoundation.h>
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <mach-o/dyld.h>
 #include <dlfcn.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <notify.h>
 #include <dispatch/dispatch.h>
@@ -143,9 +146,10 @@ static void (*orig_buffer)(id, SEL, id, id);
 static double t_first, t_last;
 static int fired;
 static double now_s(void) { struct timeval tv; gettimeofday(&tv, NULL); return tv.tv_sec + tv.tv_usec / 1e6; }
+static int test_mode(void) { return access("/tmp/acesrv-test.wav", F_OK) == 0; }
 static void my_buffer(id self, SEL _cmd, id vc, id buf) {
     orig_buffer(self, _cmd, vc, buf);
-    if (access("/tmp/acesrv-test.wav", F_OK) != 0) return;
+    if (!test_mode()) return;
     double t = now_s();
     if (t - t_last > 1.0) t_first = 0;   // a new recording started
     t_last = t;
@@ -159,6 +163,92 @@ static void my_buffer(id self, SEL _cmd, id vc, id buf) {
         if (dbg) { fprintf(dbg, "test hook: endpoint\n"); fflush(dbg); }
     }
 }
+
+// Endpointer. Siri records in the "speech recognition" audio mode, which on the iPod is about
+// 15 dB quieter than the default mode: normal speech at arm's length reaches only -45..-55 dB on
+// the audio queue's meter, over a noise floor near -67 dB. Apple's endpointer (in AVVoiceController,
+// tuned for the iPhone 4S) then misbehaves: quiet speech never counts as a startpoint (Siri gives
+// up after 5 s, error 206), while a faint noise (-64 dB) can count as one, so it stops
+// listening 0.5 s later, before you've said anything. In automatic mode (not while the Home button
+// is held), replace it with one that works relative to the measured noise floor:
+//   - skip the first 0.5 s of buffers, which carry Siri's own listening chime;
+//   - speech = a buffer the Speex encoder spent >= 300 bytes on (its own voice detection shrinks
+//     silent buffers to ~99 bytes, and still works at -30 dB), or a meter level 10 dB over the
+//     noise floor (tracked from the quietest buffers);
+//   - startpoint at the first speech, endpoint after 1 s without speech;
+//   - give up after 6 s without speech; stop at 15 s.
+// The audio itself is Speex-encoded by the time it reaches assistantd, so it can't be amplified
+// here; localsirid normalizes the level before recognition. The level meter, which drives the glow
+// around the mic button, is raised by 18 dB so it moves with normal speech.
+#define EP_IGNORE 0.5        /* s of buffers to skip: Siri's listening chime (up to -42 dB) */
+#define EP_FLOOR0 -60.0      /* initial noise floor guess, dB: the iPod measures -66..-70 in a quiet room */
+#define EP_SPEECH_DB 10.0
+#define EP_SPEECH_BYTES 300   /* Speex buffer size: ~99 bytes when its VAD hears silence, 400-700 with speech */
+#define EP_END_SILENCE 1.0
+#define EP_NO_SPEECH 6.0
+#define EP_MAX 15.0
+#define METER_BOOST_DB 18.f
+static float (*orig_avg)(id, SEL, unsigned), (*orig_peak)(id, SEL, unsigned);
+static int ep_on, ep_started, ep_done, ep_sending;
+static double ep_t0, ep_last_speech, ep_floor;
+typedef struct { uint32_t cap; void *data; uint32_t size; } AQBuffer;   // AudioQueueBuffer's first fields
+static void (*orig_rbr)(id, SEL, AQBuffer *);
+// Report on the main thread, like Apple's endpointer: the delegate stops the recorder in response,
+// and stopping the audio queue from inside its own buffer callback breaks the next recording.
+static void ep_tell(id vc, const char *sel) {
+    SEL s = sel_registerName(sel);
+    CFRetain((CFTypeRef)vc);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        id d = ((id (*)(id, SEL))objc_msgSend)(vc, sel_registerName("recordDelegate"));
+        ep_sending = 1;
+        if (d) ((void (*)(id, SEL, id))objc_msgSend)(d, s, vc);
+        ep_sending = 0;
+        CFRelease((CFTypeRef)vc);
+    });
+}
+static void my_rbr(id self, SEL _cmd, AQBuffer *b) {
+    uint32_t size = b ? b->size : 0;
+    orig_rbr(self, _cmd, b);
+    if (!ep_on || ep_done || !orig_avg) return;
+    double db = orig_avg(self, sel_registerName("averagePowerForChannel:"), 0), now = now_s();
+    if (!ep_t0) ep_t0 = now;   // time from the first buffer: buffers arrive about 1 s after recording starts
+    double t = now - ep_t0;
+    int speech = 0;
+    if (db > -100 && t >= EP_IGNORE) {   // the first buffers carry Siri's listening chime
+        if (ep_floor == 0) ep_floor = db < EP_FLOOR0 ? db : EP_FLOOR0;   // you may already be talking
+        if (db < ep_floor) ep_floor = db;                                 // fast down
+        else if (db < ep_floor + EP_SPEECH_DB) ep_floor += 0.05 * (db - ep_floor);   // slow up on non-speech
+        speech = db > ep_floor + EP_SPEECH_DB || size >= EP_SPEECH_BYTES;
+    }
+    if (dbg) { fprintf(dbg, "%.3f ep %.2f s: %u bytes, level %.1f dB, floor %.1f%s\n", now, t, size, db, ep_floor, speech ? " speech" : ""); fflush(dbg); }
+    if (speech) {
+        ep_last_speech = t;
+        if (!ep_started) { ep_started = 1; ep_tell(self, "voiceControllerDidDetectStartpoint:"); if (dbg) { fprintf(dbg, "ep: startpoint\n"); fflush(dbg); } }
+    }
+    if ((ep_started && t - ep_last_speech > EP_END_SILENCE) || (!ep_started && t > EP_NO_SPEECH) || t > EP_MAX) {
+        ep_done = 1;
+        if (!ep_started) ep_tell(self, "voiceControllerDidDetectStartpoint:");   // a request needs one; localsirid finds no speech
+        ep_tell(self, "voiceControllerDidDetectEndpoint:");
+        if (dbg) { fprintf(dbg, "ep: endpoint at %.2f s\n", t); fflush(dbg); }
+    }
+}
+// Apple's endpointer reports to the recorder's delegate (ADSpeechManager); drop those reports while
+// ours is in charge. (Its own startpointDetected/endpointDetected must still run: they keep the
+// recorder's state, and skipping them makes the next recording fail to start.)
+static IMP orig_sp_d, orig_ep_d;
+static void my_sp_d(id self, SEL _cmd, id vc) { if (!ep_on || ep_sending) ((void (*)(id, SEL, id))orig_sp_d)(self, _cmd, vc); }
+static void my_ep_d(id self, SEL _cmd, id vc) { if (!ep_on || ep_sending) ((void (*)(id, SEL, id))orig_ep_d)(self, _cmd, vc); }
+static BOOL (*orig_start)(id, SEL);
+static BOOL my_start(id self, SEL _cmd) {
+    int mode = ((int (*)(id, SEL))objc_msgSend)(self, sel_registerName("recordEndpointMode"));
+    ep_on = mode == 1 && !test_mode() && access("/tmp/siri-apple-endpointer", F_OK) != 0;
+    ep_started = ep_done = 0; ep_floor = 0; ep_t0 = 0;
+    if (dbg) { fprintf(dbg, "%.3f recording, endpoint mode %d, own endpointer %d\n", now_s(), mode, ep_on); fflush(dbg); }
+    return orig_start(self, _cmd);
+}
+static float boost_db(float db) { db += METER_BOOST_DB; return db > 0 ? 0 : db; }
+static float my_avg(id self, SEL _cmd, unsigned ch) { return boost_db(orig_avg(self, _cmd, ch)); }
+static float my_peak(id self, SEL _cmd, unsigned ch) { return boost_db(orig_peak(self, _cmd, ch)); }
 
 // ADAceConnection arms a response timer after every send, sized for Apple's servers. An on-device
 // answer takes longer than that (speech recognition alone is 1-6 s), so assistantd would drop the
@@ -183,8 +273,29 @@ static void hook_voice_controller(void) {
         Method bm = sm ? class_getInstanceMethod(sm, sel_registerName("voiceControllerRecordBufferAvailable:buffer:")) : NULL;
         if (bm) orig_buffer = (void *)method_setImplementation(bm, (IMP)my_buffer);
     }
+    // Endpointer hooks, all or none. assistantd's own ADSpeechManager registers later than
+    // AVVoiceController, so this is retried like the others.
+    static int ep_hooked;
+    Class c = (Class)objc_getClass("AVVoiceController"), sm = (Class)objc_getClass("ADSpeechManager");
+    if (!ep_hooked && c && sm) {
+        SEL s1 = sel_registerName("voiceControllerDidDetectStartpoint:"), s2 = sel_registerName("voiceControllerDidDetectEndpoint:");
+        Method mr = class_getInstanceMethod(c, sel_registerName("recordBufferReceived:")),
+               ms = class_getInstanceMethod(c, sel_registerName("startRecording")),
+               ma = class_getInstanceMethod(c, sel_registerName("averagePowerForChannel:")),
+               mp = class_getInstanceMethod(c, sel_registerName("peakPowerForChannel:")),
+               m1 = class_getInstanceMethod(sm, s1), m2 = class_getInstanceMethod(sm, s2);
+        if (mr && ms && ma && mp && m1 && m2) {
+            orig_rbr = (void *)method_setImplementation(mr, (IMP)my_rbr);
+            orig_start = (void *)method_setImplementation(ms, (IMP)my_start);
+            orig_avg = (void *)method_setImplementation(ma, (IMP)my_avg);
+            orig_peak = (void *)method_setImplementation(mp, (IMP)my_peak);
+            orig_sp_d = method_setImplementation(m1, (IMP)my_sp_d);
+            orig_ep_d = method_setImplementation(m2, (IMP)my_ep_d);
+            ep_hooked = 1;
+            if (dbg) { fprintf(dbg, "SiriCapability: endpointer hooked\n"); fflush(dbg); }
+        }
+    }
     if (orig_prepare) return;
-    Class c = (Class)objc_getClass("AVVoiceController");
     Method mt = c ? class_getInstanceMethod(c, sel_registerName("prepareRecordWithSettings:error:")) : NULL;
     if (mt) orig_prepare = (void *)method_setImplementation(mt, (IMP)my_prepare);
     if (mt && dbg) { fprintf(dbg, "SiriCapability: hooked AVVoiceController\n"); fflush(dbg); }
