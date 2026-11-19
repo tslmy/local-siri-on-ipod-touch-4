@@ -287,11 +287,12 @@
 <li><strong>Sequential reads.</strong> Reading the file with large <code>pread</code> calls fills the same <a href="https://en.wikipedia.org/wiki/Page_cache">page cache</a> the mapping uses, at 80 MB/s instead of ~6 MB/s.</li>
 <li><strong>Speech model first.</strong> acesrv tells localsirid to load the speech model the moment Siri starts listening, while you're still talking.</li>
 <li><strong>Language model next.</strong> Only the parts of the LLM a forward pass touches are read, right after the transcript goes back to Siri.</li>
+<li><strong>Locked until the answer is done.</strong> Even right after that read, Siri's memory pressure kept evicting pages, and the model read them back one 4 KiB page fault at a time: 1,300 to 3,500 of them while reading a 13-token question, and hundreds more during the answer. So localsirid now pins the model with <a href="https://man7.org/linux/man-pages/man2/mlock.2.html"><code>mlock</code></a>, one megabyte at a time as it reads it, and releases it after the answer. Page faults dropped to zero, reading the question went from 3.6–4.5 s to 2.8–3.6 s, and nothing got killed for lack of memory. What remains of the gap to the warm, Siri-less numbers is Siri's own animation, which takes about 17% of the CPU while you wait.</li>
 </ul>
 
 <figure class="widget wide" data-widget="timeline">
   <figcaption><strong>From the end of speech to the full answer</strong>, for "What is the capital of France?" inside Siri.</figcaption>
-  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="now">Whistle + codebook LLM</button><button data-v="alone">brain alone, warm</button></div>
+  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="now">Whistle + codebook LLM, locked in RAM</button><button data-v="alone">brain alone, warm</button></div>
   <div class="sx-tl"></div>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>

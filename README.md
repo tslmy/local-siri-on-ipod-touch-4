@@ -33,9 +33,9 @@ Tested on an iPod touch 4G (iPod4,1) running iOS 6.1.6 (10B500), jailbroken.
 |---|---|
 | Native Siri UI opens, listens, shows what you said, shows and speaks the answer | ✅ Live microphone, with questions spoken by a Mac nearby |
 | Speech recognition (Whistle) | 2.7–3.8 s for a short question with the Siri UI open; 1.3–2.4 s alone (`just bench`) |
-| Answer, first word | 7–8 s after the transcript: 2.9 s to read the model back from flash (the Siri UI leaves too little RAM to keep it), then 4.5 s to read the question |
-| Answer, generation | 2–2.5 tokens/s with the Siri UI open; 3.8 tokens/s alone |
-| Total, from when Siri stops listening to the full answer | about 15–20 s for a one-sentence answer |
+| Answer, first word | About 6 s after the transcript: 2.7–3.0 s to read the model back from flash (the Siri UI leaves too little RAM to keep it between questions), then 2.8–3.6 s to read the question. The model is locked in RAM until the answer is done, which removed 1,300–3,500 page faults per question |
+| Answer, generation | About 2.5 tokens/s with the Siri UI open (Siri's animation takes ~17% of the CPU); 3.8 tokens/s alone |
+| Total, from when Siri stops listening to the full answer | about 12–15 s for a one-sentence answer |
 | Answer quality | What a 135M model can do: in live tests "Paris", "Tokyo", "Shakespeare", "Everest" and the Moon's distance were right; "ounces in a pound" still isn't |
 | Quiet voices | The iPod's only microphone is on the back, beside the rear camera, and Siri's recording mode is quiet. A voice aimed at the screen reaches it at only 5–10x the room noise. In one round of six real-voice questions, Whistle got 2 right (Moonshine none); the Mac's louder voice is right most of the time. Tilting the top edge toward your mouth helps. If nothing is heard, Siri says "Sorry, I didn't catch that." |
 | Physical Home-button hold | Should behave like Activator's Siri action, which is what was tested; not pressed by hand yet |

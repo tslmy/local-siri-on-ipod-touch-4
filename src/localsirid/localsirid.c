@@ -41,6 +41,7 @@ static const char *SYSTEM_PROMPT =
     "You are Siri, a voice assistant. Give brief, direct answers.";   // shortest answers that stayed right
 
 static moonshine_t *asr; static whistle_t *wsr; static llm_t *lm; static int prefix_len, evict = 1, kill_voiced = 0;
+static int lock_llm = 1;   // LOCALSIRI_MLOCK=0: don't pin the LLM in RAM from its read-back to the end of the answer
 
 static double now_ms(void) { struct timeval tv; gettimeofday(&tv, 0); return tv.tv_sec * 1e3 + tv.tv_usec / 1e3; }
 
@@ -60,10 +61,15 @@ static void sendline(int fd, const char *tag, const char *s, int len) {
     write(fd, buf, o);
 }
 
-typedef struct { int fd; int n, sentences; } Gen;
+// Page faults so far (major: read from flash; minor: page already in RAM, just mapped).
+#include <sys/resource.h>
+static void faults(long *maj, long *min) { struct rusage u; getrusage(RUSAGE_SELF, &u); *maj = u.ru_majflt; *min = u.ru_minflt; }
+
+typedef struct { int fd; int n, sentences; double last, gaps[64]; } Gen;
 // Stream each token; stop after two sentences (or one long one) like Siri would.
 static int tok_cb(void *ud, const char *piece, int len) {
-    Gen *g = ud; sendline(g->fd, "TOK", piece, len); g->n++;
+    Gen *g = ud; sendline(g->fd, "TOK", piece, len);
+    double t = now_ms(); if (g->n < 64) g->gaps[g->n] = t - g->last; g->last = t; g->n++;
     while (len > 0 && (piece[len - 1] == '"' || piece[len - 1] == ')')) len--;
     if (len > 0 && (piece[len - 1] == '.' || piece[len - 1] == '!' || piece[len - 1] == '?')) {
         g->sentences++;
@@ -76,9 +82,20 @@ static void answer(int fd, const char *question, double asr_ms) {
     int ids[MAXSEQ];
     llm_set_pos(lm, prefix_len);
     int n = llm_chat_user(lm, question, ids, MAXSEQ - prefix_len - MAXNEW);
+    long mj0, mn0, mj1, mn1, mj2, mn2;
+    faults(&mj0, &mn0);
     if (llm_feed(lm, ids, n) < 0) { sendline(fd, "ERR", "question too long", 17); return; }
-    Gen g = {fd, 0, 0};
+    faults(&mj1, &mn1);
+    Gen g = {fd, 0, 0, now_ms(), {0}};
+    double r1 = llm_resident(lm);
     llm_generate(lm, MAXNEW, 1.1f, tok_cb, &g);
+    faults(&mj2, &mn2);
+    {   // diagnostics: faults per stage, residency, and time per answer token
+        char gl[512]; int o = 0;
+        for (int i = 0; i < g.n && i < 64 && o < 480; i++) o += snprintf(gl + o, sizeof gl - o, " %.0f", g.gaps[i]);
+        fprintf(stderr, "[localsirid] faults: prompt %ld major / %ld minor, gen %ld / %ld; model in RAM %.0f%% before gen, %.0f%% after; ms per token:%s\n",
+                mj1 - mj0, mn1 - mn0, mj2 - mj1, mn2 - mn1, r1 * 100, llm_resident(lm) * 100, gl);
+    }
     double pm, gm; int pn, gn;
     llm_stats(lm, &pm, &pn, &gm, &gn);
     char buf[128];
@@ -202,13 +219,22 @@ static void handle(int fd) {
             double asr_ms = now_ms() - t0;
             sendline(fd, "HEARD", text, (int)strlen(text));   // Siri shows the words now
             if (evict) { if (wsr) whistle_advise(wsr, 0); else moonshine_advise(asr, 0); }
-            double tp = now_ms();
+            double tp = now_ms(), r0 = llm_resident(lm);
+            long pmj0, pmn0, pmj1, pmn1; faults(&pmj0, &pmn0);
             if (pf_on) pthread_join(pf, NULL);
-            llm_prefetch(lm);          // sequential read: ~1-3 s, versus ~10 s of page faults under pressure
-            fprintf(stderr, "[localsirid] llm prefetch %.0f ms\n", now_ms() - tp);
+            // Sequential read: ~3 s, versus ~10 s of page faults under pressure. Then keep it in RAM until
+            // the answer is done: with Siri open, the system otherwise evicts pages mid-answer and reads
+            // them back one 4 KB fault at a time (measured: 1,300-3,500 faults while reading the question).
+            int locked = lock_llm && llm_prefetch_lock(lm) == 0;
+            if (!locked) { if (lock_llm) perror("[localsirid] mlock"); llm_prefetch(lm); }
+            faults(&pmj1, &pmn1);
+            fprintf(stderr, "[localsirid] llm prefetch %.0f ms; model in RAM %.0f%% before, %.0f%% after; faults %ld major / %ld minor\n",
+                    now_ms() - tp, r0 * 100, llm_resident(lm) * 100, pmj1 - pmj0, pmn1 - pmn0);
+            if (locked) fprintf(stderr, "[localsirid] llm locked in RAM\n");
             fprintf(stderr, "[localsirid] heard %.2f s audio in %.0f ms: \"%s\"\n", n / 16000.0, asr_ms, text);
             if (has_letters(text)) answer(fd, text, asr_ms);
             else write(fd, "DONE\t0\t0\t0\t0\n", 13);
+            if (locked) llm_unlock(lm);
         }
         free(pcm); free(a);
     } else sendline(fd, "ERR", "bad request", 11);
@@ -220,6 +246,7 @@ int main(int argc, char **argv) {
     char p1[512], p2[512];
     signal(SIGPIPE, SIG_IGN);
     if (getenv("LOCALSIRI_EVICT")) evict = atoi(getenv("LOCALSIRI_EVICT"));
+    if (getenv("LOCALSIRI_MLOCK")) lock_llm = atoi(getenv("LOCALSIRI_MLOCK"));
     if (getenv("LOCALSIRI_OVERLAP")) overlap = atoi(getenv("LOCALSIRI_OVERLAP"));
     if (getenv("LOCALSIRI_KILL_VOICED")) kill_voiced = atoi(getenv("LOCALSIRI_KILL_VOICED"));
     // Optionally run ahead of Siri's UI animation on the single core (LOCALSIRI_NICE=-10). Measured no gain.

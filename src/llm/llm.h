@@ -9,6 +9,9 @@ int llm_chat_prefix(llm_t *m, const char *system, int *out, int max);
 int llm_chat_user(llm_t *m, const char *user, int *out, int max);
 void llm_set_pos(llm_t *m, int pos);
 void llm_advise(llm_t *m, int need); // page in (1) / drop (0) weights
+int llm_prefetch_lock(llm_t *m);       // llm_prefetch, and pin the weights in RAM (0 = ok)
+void llm_unlock(llm_t *m);
+double llm_resident(llm_t *m);        // share of the weights in RAM now (0..1)
 void llm_prefetch(llm_t *m);           // read the weights a forward pass needs into the page cache, sequentially
 int llm_get_pos(llm_t *m);
 int llm_feed(llm_t *m, const int *toks, int n);          // prefill (batched)

@@ -305,6 +305,27 @@ static void forward_chunk(llm_t *m, const int *toks, int T, int want_logits) {
     }
 }
 
+// Read the whole file sequentially and pin it in RAM 1 MB at a time, so that early chunks can't be
+// evicted again while later ones are read. Returns 0 on success; on failure nothing stays pinned.
+int llm_prefetch_lock(llm_t *m) {
+    const size_t CH = 1 << 20;
+    for (size_t off = 0; off < m->map_len; off += CH) {
+        size_t n = m->map_len - off < CH ? m->map_len - off : CH;
+        prefetch_range(m->fd, off, n);
+        if (mlock((char *)m->map + off, n)) { if (off) munlock(m->map, off); return -1; }
+    }
+    return 0;
+}
+void llm_unlock(llm_t *m) { munlock(m->map, m->map_len); }
+// Share of the model's pages in RAM right now (mincore), for diagnosing evictions.
+double llm_resident(llm_t *m) {
+    size_t pg = 4096, n = (m->map_len + pg - 1) / pg, in = 0;
+    char *v = malloc(n);
+    if (!v || mincore(m->map, m->map_len, v)) { free(v); return -1; }
+    for (size_t i = 0; i < n; i++) in += v[i] & 1;
+    free(v);
+    return (double)in / n;
+}
 void llm_advise(llm_t *m, int need) { madvise(m->map, m->map_len, need ? MADV_WILLNEED : MADV_DONTNEED); }
 // Pull everything a forward pass reads into the page cache, sequentially: the transformer layers
 // and the classifier's slice of the embedding (rows beyond LLM_VOCAB_LIMIT are only looked up).
