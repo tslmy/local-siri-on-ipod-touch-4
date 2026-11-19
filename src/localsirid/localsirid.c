@@ -126,44 +126,50 @@ static void handle(int fd) {
         int16_t *pcm = malloc(n * 2); float *a = malloc(n * 4);
         if (readn(fd, pcm, n * 2) == 0) {
             save_wav("/var/root/siri/last.wav", pcm, n);
-            // loudest 100 ms window; below ~-40 dBFS there is no speech worth decoding
-            double peak = 0, best = 0;
+            // Level check, gain and trimming, on 100 ms windows (50 ms hop). Siri's end tone lands in
+            // the last ~100 ms (a loud click), so drop that first.
+            double peak = 0;
             for (uint32_t i = 0; i < n; i++) { a[i] = pcm[i] / 32768.f; if (fabs(a[i]) > peak) peak = fabs(a[i]); }
-            for (uint32_t w = 0; w + 1600 <= n; w += 800) {
-                double e = 0; for (uint32_t i = w; i < w + 1600; i++) e += a[i] * a[i];
-                if (e / 1600 > best) best = e / 1600;
+            if (n > 3200) n -= 1600;
+            int nw = n >= 1600 ? (int)((n - 1600) / 800 + 1) : 0;
+            float *r = malloc((nw + 1) * sizeof *r), *srt = malloc((nw + 1) * sizeof *srt);
+            for (int k = 0; k < nw; k++) {
+                double e = 0; for (uint32_t i2 = k * 800; i2 < k * 800 + 1600; i2++) e += a[i2] * a[i2];
+                r[k] = srt[k] = sqrt(e / 1600);
             }
-            best = sqrt(best);
-            fprintf(stderr, "[localsirid] audio %.2f s, peak %.3f, loudest-100ms rms %.4f\n", n / 16000.0, peak, best);
-            if (best < 0.02) {
+            for (int x = 1; x < nw; x++) { float v = srt[x]; int y = x - 1; while (y >= 0 && srt[y] > v) { srt[y + 1] = srt[y]; y--; } srt[y + 1] = v; }
+            double best = nw ? srt[nw - 1] : 0, floor_ = nw ? srt[nw / 5] : 0;   // loudest window; noise floor (20th percentile)
+            fprintf(stderr, "[localsirid] audio %.2f s, peak %.3f, loudest-100ms rms %.4f, floor %.5f\n", n / 16000.0, peak, best, floor_);
+            // Speech must stand out from the room noise. Siri's speech-recognition audio mode is
+            // quiet on the iPod (normal speech at arm's length is often -50 dBFS), so no fixed level.
+            if (best < 0.001 || best < floor_ * 6) {
                 sendline(fd, "HEARD", "", 0); write(fd, "DONE\t0\t0\t0\t0\n", 13);
-                free(pcm); free(a); return;
+                free(r); free(srt); free(pcm); free(a); return;
+            }
+            // Bring the loudest window to -20 dBFS (at most +36 dB): Moonshine's input isn't normalized.
+            float g = 0.1 / best; if (g > 64) g = 64;
+            if (g > 1) {
+                for (uint32_t i = 0; i < n; i++) a[i] *= g;
+                for (int k = 0; k < nw; k++) r[k] *= g;
+                floor_ *= g;
+                fprintf(stderr, "[localsirid] gain %.1f dB\n", 20 * log10(g));
             }
             // Trim silence: Siri's endpointer often keeps recording for seconds after you stop, and
-            // speech recognition time grows with audio length. Siri's end tone lands in the last
-            // ~100 ms (a loud click), so drop that, then keep the span of 100 ms windows louder than
-            // 8x the noise floor (20th percentile), padded by 300 ms.
-            if (n > 3200) n -= 1600;
+            // speech recognition time grows with audio length. Keep the span of windows louder than
+            // 8x the noise floor, padded by 300 ms.
             {
-                int nw = n >= 1600 ? (int)((n - 1600) / 800 + 1) : 0;
-                float *r = malloc((nw + 1) * sizeof *r), *srt = malloc((nw + 1) * sizeof *srt);
-                for (int k = 0; k < nw; k++) {
-                    double e = 0; for (uint32_t i2 = k * 800; i2 < k * 800 + 1600; i2++) e += a[i2] * a[i2];
-                    r[k] = srt[k] = sqrt(e / 1600);
-                }
-                for (int x = 1; x < nw; x++) { float v = srt[x]; int y = x - 1; while (y >= 0 && srt[y] > v) { srt[y + 1] = srt[y]; y--; } srt[y + 1] = v; }
-                double floor_ = nw ? srt[nw / 5] : 0, thr = floor_ * 8 > 0.004 ? floor_ * 8 : 0.004;
+                double thr = floor_ * 8 > 0.004 ? floor_ * 8 : 0.004;
                 long first = -1, last = -1;
                 for (int k = 0; k < nw; k++) if (r[k] > thr) { if (first < 0) first = k * 800L; last = k * 800L + 1600; }
                 if (first >= 0) {
                     long s0 = first - 4800 > 0 ? first - 4800 : 0, s1 = last + 4800 < (long)n ? last + 4800 : (long)n;
                     if (s0 > 0 || s1 < (long)n) {
-                        fprintf(stderr, "[localsirid] trimmed %.2f s -> %.2f s (floor %.4f)\n", n / 16000.0, (s1 - s0) / 16000.0, floor_);
+                        fprintf(stderr, "[localsirid] trimmed %.2f s -> %.2f s\n", n / 16000.0, (s1 - s0) / 16000.0);
                         memmove(a, a + s0, (s1 - s0) * sizeof *a); n = (uint32_t)(s1 - s0);
                     }
                 }
-                free(r); free(srt);
             }
+            free(r); free(srt);
             double t0 = now_ms();
             // Optionally free the TTS daemon's RAM (voiced, ~18 MB). Off by default: with the native
             // Siri UI it kills Siri mid-sentence, and prefetching made it unnecessary.
