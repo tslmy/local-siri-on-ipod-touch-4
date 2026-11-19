@@ -315,10 +315,9 @@ static void *backend_job(void *arg) {
     if (!job_live(j)) logf_("connection gone, dropping answer");
     else if (err) reply_with_answer(j->refId, NULL, "My on-device brain isn't running right now.");
     else if (!heard[0]) {
-        CFMutableDictionaryRef p, o = ace_cmd("SpeechFailure", "com.apple.ace.speech", j->refId, &p);
-        dset_str(p, "reason", "Inaudible"); dset_str(p, "reasonDescription", "No speech recognized");
-        send_obj(o); CFRelease(o);
-        send_simple("RequestCompleted", "com.apple.ace.system", j->refId);
+        // Say so: a SpeechFailure just closes Siri without a word, which looks like a crash.
+        logf_("heard nothing");
+        reply_with_answer(j->refId, NULL, "Sorry, I didn't catch that.");
     } else {
         logf_("heard \"%s\" -> \"%s\"", heard, answer);
         reply_with_answer(j->refId, j->sent_heard ? NULL : heard, answer[0] ? answer : "Hmm, I don't know.");
