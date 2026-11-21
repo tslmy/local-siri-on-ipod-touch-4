@@ -1044,7 +1044,9 @@
       });
       svg.replaceChildren(...kids);
       const f = (v) => v.toFixed(v < 10 ? 1 : 0);
-      note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G} (${(n / 1e6).toFixed(0)} million weights). Kurtosis (3 for a bell curve): ${d.kurt[0].toFixed(2)} before, ${d.kurt[1].toFixed(2)} after. Beyond 3σ (a bell curve has 0.27%): ${d.beyond3[0]}% before, ${d.beyond3[1]}% after. Largest value: ${f(d.max[0])}σ before, ${f(d.max[1])}σ after. ` + (st.norm ? `A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.` : 'Here only each whole matrix is scaled, so groups keep their own sizes, and values beyond ±6σ are counted in the end bars.');
+      note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G}: ${(n / 1e6).toFixed(0)} million weights. ` + (st.norm ? `A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.` : 'Only each whole matrix is scaled here, so groups keep their own sizes, and values beyond ±6σ are counted in the end bars.');
+      const rows = [['', 'Before rotation', 'After rotation', 'Ideal bell curve'], ['Kurtosis (a measure of how heavy the tails are)', d.kurt[0].toFixed(2), d.kurt[1].toFixed(2), '3'], ['Weights beyond 3σ', d.beyond3[0] + '%', d.beyond3[1] + '%', '0.27%'], ['Largest value', f(d.max[0]) + 'σ', f(d.max[1]) + 'σ', '']];
+      $(fig, '.sx-stat').replaceChildren(...rows.map((r, i) => { const tr = el('tr'); r.forEach((t, j) => tr.append(el(i ? (j ? 'td' : 'th') : 'th', j ? 'num' : null, t))); return tr; }));
     };
     fig.querySelectorAll('[data-cls]').forEach((b) => b.addEventListener('click', () => { st.cls = b.dataset.cls; draw(); }));
     $(fig, '[data-k=g]').addEventListener('input', (e) => { st.g = +e.target.value; draw(); });

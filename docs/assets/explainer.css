@@ -363,3 +363,9 @@ html { scroll-behavior: smooth; }
 .xref-back:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .xref-back[hidden] { display: none; }
 .siri-explainer figure.widget { scroll-margin-top: 1rem; }
+
+.sx-stat { width: 100%; border-collapse: collapse; margin: .4rem 0 0; font: .85rem/1.4 var(--sx-sans, system-ui, sans-serif); }
+.sx-stat th, .sx-stat td { padding: .3rem .6rem; border-bottom: 1px solid var(--sx-rule); text-align: left; font-weight: normal; }
+.sx-stat thead th, .sx-stat tr:first-child th { font-weight: bold; color: var(--muted); }
+.sx-stat td.num, .sx-stat th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.sx-stat td.num { font-weight: bold; }
