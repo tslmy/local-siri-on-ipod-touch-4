@@ -295,3 +295,5 @@
 .sx-ol .odot { opacity: .65; }
 .sx-ol .mean { stroke: var(--text); stroke-width: 2; }
 .sx-ol .meant { fill: var(--text); font-weight: bold; }
+.sx-r2 .arrh { stroke: none; }
+.sx-r2 .axl { font-style: italic; fill: var(--text); }

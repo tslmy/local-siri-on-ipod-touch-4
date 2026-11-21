@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=42" />
+    <link rel="stylesheet" href="assets/explainer.css?v=43" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -311,46 +311,64 @@
 <li>But you can change the axes you write them against.</li>
 </ul>
 
-<p>Start with the smallest case: a group of just two weights, drawn as a point on a plane:</p>
-<ul>
-<li>The 2-bit levels, four per axis, form a grid inside a square that just reaches the point's largest coordinate.</li>
-<li>A point close to an axis has one big weight and one tiny one, so its square must be as large as the point is long, and the grid is coarse.</li>
-<li>A point on the diagonal has two equal coordinates, which is as flat as it gets: the square is smaller and the grid finer.</li>
-</ul>
+<p>To visualize axes, let's consider the smallest case: groups of just 2 weights. Below is a row of weights cut into groups of two, like the one in the previous figure and at the same cell size. First, make up some groups:</p>
 
-<figure class="widget wide" data-widget="rot2d">
-  <figcaption><strong>Rotating groups of two weights.</strong> Each dot is one group of two weights, drawn as a point on a circle of length 1 (the group's length is divided out, as in step 1), and each group has its own color. Hollow dots mark where the groups started, and filled dots are where the rotation has taken them. First, make up some groups:</figcaption>
+<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="strips">
+  <figcaption><strong>Groups of two weights.</strong> Each group has a number and a color, so that you can follow it through the figures below.</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
   <div class="sx-opts">
-    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one, so a group starts near an axis.</span></button>
-    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size, so a group starts near a diagonal.</span></button>
+    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one.</span></button>
+    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size.</span></button>
   </div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
     <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
     <button data-act="new">new points</button>
   </div>
-  <p class="sx-hint">How tightly the groups hug their starting place: at 100% every group is within 10° of it, and at 0% the directions are spread evenly round the circle.</p>
-  <p class="sx-cap2">Here is the same data laid out like the previous figure: a row of weights cut into groups of two, with the same cell size. Each group is one of the dots below, with the same number and color. The row grows to the right as you add groups, and it follows the rotation slider.</p>
+  <p class="sx-hint">How tightly the groups hug "one big weight" or "two similar weights": at 100% every group is within 10° of it, and at 0% the directions are spread evenly.</p>
   <div class="sx-trip">
-    <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups as a matrix, one row per group, with each group's scale printed on it"></svg><p class="sx-hint">Weights, with each group's scale printed on it</p></div>
-    <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the scale of each group"></svg><p class="sx-hint">Scale of each group (the more gold, the larger)</p></div>
-    <div class="sx-tcol"><svg class="sx-gr" data-v="te" role="img" aria-label="Heatmap of the rounding error of each weight"></svg><p class="sx-hint">Rounding error (the redder, the larger)</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups as a row of cells, with each group's scale printed on it"></svg><p class="sx-hint">Weights, with each group's scale printed on it</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the scale of each group"></svg><p class="sx-hint">Scale of each group, its largest weight (the more gold, the larger)</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="te" role="img" aria-label="Heatmap of the rounding error of each weight"></svg><p class="sx-hint">Rounding error, after rounding each weight to one of 4 levels (the redder, the larger)</p></div>
   </div>
-  <p class="sx-cap2">A square marks the range of a group's levels, 4 per axis (2 bits). The small dots inside it are the 16 values that group can be stored as: each of its two coordinates is rounded to the nearest level, and a line in the group's color shows where it lands. Groups that are alike have nearly the same square, so they can lie on top of each other: a colored chip above each square's top-left corner counts them, and rotating pulls them apart. Click a dot to see its numbers below. Choose how the levels are placed:</p>
+</figure>
+
+<p>Each group is just two numbers, <em>w</em><sub>1</sub> and <em>w</em><sub>2</sub>, so it can also be read as a point on a plane: the first weight is its horizontal coordinate and the second weight is its vertical one. Here are the same groups drawn that way, with the same numbers and colors:</p>
+
+<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points">
+  <figcaption><strong>Groups as points.</strong> Each dot is one group, placed at (<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>). Change the mock groups above and the dots move.</figcaption>
+  <svg class="sx-r2" viewBox="0 0 330 300" style="max-width:34rem" role="img" aria-label="Each group of two weights drawn as a point, with the first weight on the horizontal axis and the second on the vertical axis"></svg>
+</figure>
+
+<p>Now let's see what quantization does to these points:</p>
+<ul>
+<li>The 2-bit levels, four per axis, form a grid of 16 points inside a square. A group is stored as the nearest grid point: each of its two weights is rounded to the nearest level.</li>
+<li>The arrow from a dot shows how far that rounding moves it, which is the group's rounding error.</li>
+<li>A point close to an axis has one big weight and one tiny one, so its square must be as large as the point is long, and the grid is coarse.</li>
+<li>A point on the diagonal has two equal weights, which is as flat as it gets: the square is smaller and the grid finer.</li>
+</ul>
+
+<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant">
+  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own color. Click a dot to make its square and arrow thicker. Choose how the levels are placed:</figcaption>
   <div class="sx-rowlabel sx-block">Levels</div>
   <div class="sx-opts">
-    <button data-mode="plain" aria-pressed="true"><strong>Reach each group's largest weight</strong><span>Step 1: every group has its own scale, so each gets its own square in its own color, drawn to just reach its largest coordinate, with the evenly spaced levels of plain quantization.</span></button>
-    <button data-mode="fixed" aria-pressed="false"><strong>One fixed grid for all groups</strong><span>Step 3's idea: the length is divided out and one grid (a single gold square) is shared by every group, here sized for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed too, but Gaussian-shaped and built for groups of 64.</span></button>
+    <button data-mode="plain" aria-pressed="true"><strong>Reach each group's largest weight</strong><span>Step 1: every group has its own scale, so each gets its own square in its own color, drawn to just reach its largest coordinate, with the evenly spaced levels of plain quantization. Groups that are alike have nearly the same square, so they can lie on top of each other: a colored chip above each square's top-left corner counts them.</span></button>
+    <button data-mode="fixed" aria-pressed="false"><strong>One fixed grid for all groups</strong><span>Step 3's idea: the length is divided out, so the dots sit on a circle of length 1, and one grid (a single gold square) is shared by every group, here sized for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed too, but Gaussian-shaped and built for groups of 64.</span></button>
   </div>
-  <p class="sx-cap2">The curve shows, at every angle, the largest weight as a share of the group's length, averaged over the groups. Lower is flatter, and the rounding error follows it. Now rotate. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
+  <svg class="sx-r2" viewBox="0 0 330 300" style="max-width:34rem" role="img" aria-label="Groups as points with the square of quantization levels, the grid, and an arrow from each point to the grid point it is stored as"></svg>
+</figure>
+
+<p>Now rotate the groups. The curve shows, at every angle, the largest weight as a share of the group's length, averaged over the groups. Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
+
+<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant ghost curve">
+  <figcaption><strong>Rotating groups of two weights.</strong> Hollow dots mark where the groups started, and filled dots are where the rotation has taken them.</figcaption>
   <div class="sx-rowlabel sx-block">Rotation</div>
   <div class="sx-controls">
     <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
     <button data-act="reset">reset</button>
     <button data-act="follow" aria-pressed="false">camera follows the points</button>
   </div>
-  <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Points on a circle with the square of quantization levels around the selected point, and a curve of average rounding error against rotation angle"></svg>
+  <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Groups as points with their squares of levels, and a curve of average spikiness against rotation angle"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
   <p class="sx-note">The rotation slider is only an animation: in practice a rotation is applied once, all at once.</p>
 </figure>
@@ -490,7 +508,7 @@ Here are the entries of these matrices, before the scaling:</p>
 </table></div>
 <p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the 2D picture shows when it helps. This is the same figure as before, with that angle marked:</p>
 
-<figure class="widget wide" data-widget="rot2d" data-had="1">
+<figure class="widget wide" data-widget="rot2d" data-scene="had" data-layers="points quant ghost curve" data-had="1">
   <figcaption><strong>The Hadamard angle.</strong> The same two-weight groups as before, now with the Hadamard matrix marked on the curve and shown next to the rotation matrix. Make up some groups, then rotate:</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
   <div class="sx-opts">
@@ -690,6 +708,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=42" defer></script>
+    <script src="assets/explainer.js?v=44" defer></script>
   </body>
 </html>
