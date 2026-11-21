@@ -1174,6 +1174,34 @@
     fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
   };
 
+  // 11b. Four rotated groups of two weights, each with its own grid of levels (the problem step 3 solves)
+  const gridsFig = (fig) => {
+    const svg = $(fig, 'svg'), tab = $(fig, '.sx-stat'), note = $(fig, '.sx-readout');
+    const P = [[.45, .30], [-.95, .75], [1.45, -1.20], [-1.85, -1.60]], S = 300 / 4.4, cx = 175, cy = 170;
+    const X = (v) => cx + v * S, Y = (v) => cy - v * S, f2 = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+    const draw = () => {
+      const L = +$(fig, '[data-k=l]').value; $(fig, '[data-o=l]').textContent = L;
+      const kids = [], line = (x1, y1, x2, y2) => sv('line', { x1, y1, x2, y2 }, 'stroke:var(--muted);stroke-width:1'), txt = (x, y, t) => { const e = sv('text', { x, y, class: 'lbl' }); e.textContent = t; return e; };
+      kids.push(line(X(-2.2), cy, X(2.2), cy), line(cx, Y(-2.2), cx, Y(2.2)), txt(X(2.2) + 6, cy + 4, 'w₁'), txt(cx + 6, Y(2.2) - 4, 'w₂'));
+      const m = P.map(([u, v]) => Math.max(Math.abs(u), Math.abs(v))), levels = (mm) => Array.from({ length: L }, (_, k) => mm * (-1 + 2 * k / (L - 1)));
+      [...P.keys()].sort((a, b) => m[b] - m[a]).forEach((i) => {
+        const col = `var(--pc${i})`; kids.push(sv('rect', { x: X(-m[i]), y: Y(m[i]), width: 2 * m[i] * S, height: 2 * m[i] * S }, `fill:none;stroke:${col};stroke-width:1.6`));
+        levels(m[i]).forEach((u) => levels(m[i]).forEach((v) => kids.push(sv('circle', { cx: X(u), cy: Y(v), r: L > 6 ? 1.8 : 2.4 }, `fill:${col}`))));
+      });
+      P.forEach(([u, v], i) => { const col = `var(--pc${i})`; kids.push(sv('circle', { cx: X(u), cy: Y(v), r: 9 }, `fill:var(--bg);stroke:${col};stroke-width:2.4`)); const t = sv('text', { x: X(u), y: Y(v) + 3.5, 'text-anchor': 'middle' }, 'fill:var(--text);font:bold 10px var(--sx-sans)'); t.textContent = i + 1; kids.push(t); });
+      svg.replaceChildren(...kids);
+      const head = el('tr'); ['Group', 'Weights', 'Largest weight'].forEach((t, j) => head.append(el('th', j ? 'num' : null, t)));
+      const lh = el('th', 'num', `Levels on each axis (${L})`); lh.colSpan = L; head.append(lh);
+      tab.replaceChildren(head, ...P.map(([u, v], i) => {
+        const tr = el('tr'), sw = el('td'); sw.append(el('span', 'sx-sw', ''), document.createTextNode(` ${i + 1}`)); sw.firstChild.style.cssText = `display:inline-block;width:.7rem;height:.7rem;border:2px solid var(--pc${i});vertical-align:-1px`;
+        tr.append(sw, el('td', 'num', `(${f2(u)}, ${f2(v)})`), el('td', 'num', m[i].toFixed(2)));
+        levels(m[i]).forEach((q) => tr.append(el('td', 'num', f2(q)))); return tr;
+      }));
+      note.textContent = `${P.length} groups × ${L} × ${L} = ${P.length * L * L} grid points, and each group needs its own ${L} levels: ${P.length * L} numbers to store here, for just ${P.length} groups of two weights.`;
+    };
+    $(fig, '[data-k=l]').addEventListener('input', draw); draw();
+  };
+
   // 12. Why the kernel rotates the activations: the identity with real numbers, and the operation count
   const reuseFig = (fig) => {
     const N = 8, box = $(fig, '.sx-reuse'), svg = $(fig, 'svg'), note = $(fig, '.sx-readout'); let seed = 5, w = [], x = [];
@@ -1198,7 +1226,7 @@
     gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, groupingrot: groupingRotFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, groupingrot: groupingRotFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, grids: gridsFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // Cross-references: a link with class "xref" scrolls to its target and raises a floating button that carries the reader back to the link
   (() => {
