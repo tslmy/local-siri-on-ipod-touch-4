@@ -386,8 +386,6 @@
         if (md === 'plain') Q.forEach((o, i) => {          // every group has its own square, in its own colour
           kids.push(square(o.m, `stroke:${col(i)};stroke-width:${i === rot.sel ? 2 : 1};opacity:${i === rot.sel ? 1 : .55}`));   // thin and faint: the dots sit on their squares' edges, so the arrows must stand out from them
           grid(o.m, `fill:${col(i)}`, 1.8);
-          const [cx0, cy0] = pt(-o.m, o.m);
-          kids.push(sv('rect', { x: cx0 + i * 11, y: cy0 - 13, width: 8, height: 8, rx: 1.5 }, `fill:${col(i)}`));   // one chip per square, so squares lying on top of each other still count
         });
         else { kids.push(square(FLAT, 'stroke:var(--sx-gold);stroke-width:1.6')); grid(FLAT, 'fill:var(--muted)', 2); }
         P.forEach((p, i) => {                              // an arrow from each group to the grid point it is stored as, from the edge of its dot to the edge of the ring that marks the destination
