@@ -200,7 +200,7 @@
 <li><strong>Codebook.</strong> Each group is divided by its length, and one shared set of 16 levels, made for a bell curve, serves every group.</li>
 <li><strong>Kernel.</strong> The activations are rotated instead of the weights, so the weights are never rebuilt.</li>
 </ul>
-<p>A weight then costs 4.5 bits instead of 32, on average. SmolLM2 went from 538 MB to 76 MB and Whistle is 16.9 MB. For SmolLM2, <a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounding brought the perplexity on held-out chats from 9.6 down to 8.1–8.9, against 7.2 for the 32-bit floats. Each step, with a live figure, is explained in its own article: <a href="https://myli.page/posts/202611211800-how-a-weight-fits-in-4-bits/">How a weight fits in 4 bits</a>.</p>
+<p>A weight then costs 4.5 bits instead of 32, on average. SmolLM2 went from 538 MB to 76 MB and Whistle is 16.9 MB. For SmolLM2, <a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounding brought the perplexity on held-out chats from 9.6 down to 8.1–8.9, against 7.2 for the 32-bit floats. Each step is explained, with live figures, in a separate article: <a href="https://myli.page/posts/202611211800-how-a-weight-fits-in-4-bits/">How a weight fits in 4 bits</a>.</p>
 
 <p id="vs-moonshine" data-toc="Whistle against what it replaced"><strong>Whistle against what it replaced.</strong></p>
 <ul>
@@ -273,6 +273,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
       </div>
     </article>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
-    <script type="module" src="assets/explainer/index.js?v=1"></script>
+    <script type="module" src="assets/explainer/index.js?v=2"></script>
   </body>
 </html>
