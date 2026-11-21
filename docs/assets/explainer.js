@@ -340,7 +340,8 @@
   const rng2 = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
   const turn2 = (p, d) => { const c = Math.cos(d * Math.PI / 180), s = Math.sin(d * Math.PI / 180); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c]; };
   const scenes = {};
-  const genScene = (sc) => { const r = rng2(sc.st.seed); sc.base = []; for (let i = 0; i < 8; i++) sc.base.push({ k: i % 4, u: (r() - .5) * 2, len: .6 + .8 * r() }); };
+  const genScene = (sc) => { const r = rng2(sc.st.seed), r0 = r(); sc.base = []; for (let i = 0; i < 8; i++) sc.base.push({ k: i % 4, u: (r() - .5) * 2, len: .35 + ((r0 + i * .618034) % 1) });   // lengths from 0.35 to 1.35, spread so that any first few groups differ clearly (golden-ratio steps)
+  };
   const groupsOf = (sc) => { const { sp, n, at } = sc.st, w = 10 + 35 * (1 - sp / 100), off = at === 'diag' ? 45 : 0; return sc.base.slice(0, n).map(({ k, u, len }) => { const a = (k * 90 + off + u * w) * Math.PI / 180; return { dir: [Math.cos(a), Math.sin(a)], len }; }); };   // 100%: within 10 degrees of an axis; 0%: spread evenly round the circle
   const rot2dFig = (fig) => {
     const had = fig.hasAttribute('data-had'), layers = (fig.dataset.layers || 'points').split(/\s+/), has = (l) => layers.includes(l);
