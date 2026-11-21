@@ -382,13 +382,15 @@
       const pc = (v) => (v * 100).toFixed(0) + '%', e45 = had ? `, ${pc(curve[45])} at 45°` : '', r45 = had ? `, ${pc(avg(45))} at 45°` : '';
       note.textContent = `Rotated ${state.deg}°. Group ${state.sel + 1}: (${sel[0].toFixed(2)}, ${sel[1].toFixed(2)}), largest coordinate ${pc(m)} of its length, rounding error ${pc(err)}. Average over the ${pts.length} group${pts.length > 1 ? 's' : ''}: largest weight ${pc(curve[state.deg])} of the length (${pc(curve[0])} before rotating${e45}), rounding error ${pc(avg(state.deg))} (${pc(avg(0))} before${r45}). ${state.mode === 'plain' ? 'Each group has its own square, reaching its largest weight.' : 'Every group shares the one fixed grid.'}`;
       const tw = $(fig, '[data-v=tw]');
-      if (tw) {                                          // the groups as a matrix: one row per group, two weights each, following the rotation
-        const N = pts.length, CW2 = 84, RH2 = 38, x0 = 34, sc = Q.map((o) => (state.mode === 'plain' ? o.m : 1)), smax = Math.max(...sc), base2 = { R: N, C: 2, CW: CW2, RH: RH2, gs: 2, rows: true };
-        const chips = P.flatMap((p, i) => { const g = sv('circle', { cx: 14, cy: i * RH2 + RH2 / 2, r: 12 }, `fill:${col(i)}`), t = sv('text', { x: 14, y: i * RH2 + RH2 / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gnum2' }); t.textContent = i + 1; return [g, t]; });
-        const put = (svgEl, w, kids) => { svgEl.setAttribute('viewBox', `0 0 ${w} ${N * RH2}`); svgEl.style.width = w + 'px'; svgEl.replaceChildren(...kids); };
-        put(tw, x0 + 2 * CW2, [...chips, ...matrixCells({ ...base2, x0, color: (r, c) => divColor(P[r][c], 1), label: (r) => sc[r].toFixed(2) })]);
-        put($(fig, '[data-v=ts]'), CW2, matrixGroups({ R: N, C: 1, CW: CW2, RH: RH2, gs: 1, rows: true, color: (r) => goldColor(sc[r], smax) }));
-        put($(fig, '[data-v=te]'), 2 * CW2, matrixCells({ ...base2, color: (r, c) => redColor(Math.abs(P[r][c] - Q[r].q[c]), .5) }));
+      if (tw) {                                          // the groups as one row of weights, cut into groups of two, drawn at the cell size of the grouping figure and growing to the right
+        const N = pts.length, CW2 = 10, RH2 = 11, BAND = 15, sc = Q.map((o) => (state.mode === 'plain' ? o.m : 1)), smax = Math.max(...sc), line1 = { R: 1, C: 2 * N, CW: CW2, RH: RH2, gs: 2, rows: false };
+        const w = (c) => P[c >> 1][c & 1], q = (c) => Q[c >> 1].q[c & 1];
+        const chips = P.flatMap((p, i) => { const g = sv('circle', { cx: (i + .5) * 2 * CW2, cy: 7, r: 6 }, `fill:${col(i)}`), t = sv('text', { x: (i + .5) * 2 * CW2, y: 7.3, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gnum2' }); t.textContent = i + 1; return [g, t]; });
+        const put = (svgEl, h, kids) => { svgEl.setAttribute('viewBox', `0 0 640 ${h}`); svgEl.replaceChildren(...kids); };
+        const shifted = sv('g', { transform: `translate(0,${BAND})` }); shifted.append(...matrixCells({ ...line1, color: (r, c) => divColor(w(c), 1), label: (r, g) => sc[g].toFixed(2) }));
+        put(tw, BAND + RH2, [...chips, shifted]);
+        put($(fig, '[data-v=ts]'), RH2, matrixGroups({ ...line1, color: (r, g) => goldColor(sc[g], smax) }));
+        put($(fig, '[data-v=te]'), RH2, matrixCells({ ...line1, color: (r, c) => redColor(Math.abs(w(c) - q(c)), .5) }));
       }
       const box = $(fig, '.sx-mat');
       if (box) {
