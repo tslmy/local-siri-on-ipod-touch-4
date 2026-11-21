@@ -142,3 +142,18 @@
 .sx-sp .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
 .siri-explainer .sx-controls label { margin-right: .9rem; font-size: .85rem; white-space: nowrap; }
 .siri-explainer .sx-controls output { font-family: var(--sx-mono); }
+
+/* Figure 9: why weights are grouped */
+.sx-gr { width: 100%; height: auto; display: block; cursor: pointer; }
+.sx-gr .gl { stroke: var(--text); stroke-width: 1.5; }
+.sx-gr .sel { fill: none; stroke: var(--text); stroke-width: 2; }
+.sx-gr .sc { fill: var(--sx-blue); }
+.sx-gr .big { fill: var(--sx-gold); }
+.sx-gr .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+.sx-gcap { margin: .8rem 0 .3rem; color: var(--muted); font-size: .85rem; }
+.sx-gbar { display: flex; height: .8rem; margin-top: .9rem; border-radius: 2px; overflow: hidden; background: color-mix(in srgb, var(--muted) 15%, transparent); }
+.sx-gbar .idx { background: var(--sx-blue); }
+.sx-gbar .scl { background: var(--sx-gold); }
+.sx-gtab { font: .85rem var(--sx-sans); width: 100%; max-width: 30rem; }
+.sx-gtab tr[data-i] { cursor: pointer; }
+.sx-gtab tr.on { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: bold; }

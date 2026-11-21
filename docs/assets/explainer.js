@@ -355,6 +355,85 @@
     draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig };
+  // 9. Why weights are grouped: a toy matrix, per-group scales, rounding error and storage per row
+  const groupingFig = (fig) => {
+    const R = 12, C = 64, CW = 10, RH = 11, BARH = 46, SIZES = [64, 32, 16, 8, 4], NS = 'http://www.w3.org/2000/svg';
+    const state = { g: 0, out: true, sel: 0 }; let seed = 7;
+    const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = () => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
+    let base = [], outl = [];
+    const gen = () => {
+      base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => gauss() * s); });
+      outl = Array.from({ length: R }, () => new Array(C).fill(0));
+      for (let k = 0; k < 6; k++) outl[Math.floor(rng() * R)][Math.floor(rng() * C)] = (rng() < .5 ? -1 : 1) * (6 + 4 * rng());
+      state.sel = Math.floor(rng() * R);
+    };
+    const val = (r, c) => (state.out && outl[r][c] ? outl[r][c] : base[r][c]);
+    const mk = (tag, attrs, style) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); if (style) e.style.cssText = style; return e; };
+    const stats = (gs) => {                              // 16 evenly spaced levels per group, sized to its largest weight
+      const err = [], scales = []; let e2 = 0, w2 = 0;
+      for (let r = 0; r < R; r++) {
+        const er = [], sc = [];
+        for (let g = 0; g < C / gs; g++) {
+          let mx = 0; for (let c = g * gs; c < (g + 1) * gs; c++) mx = Math.max(mx, Math.abs(val(r, c)));
+          const step = 2 * mx / 15; sc.push({ mx, step });
+          for (let c = g * gs; c < (g + 1) * gs; c++) { const x = val(r, c), q = step ? Math.round((x + mx) / step) * step - mx : 0; er.push(Math.abs(x - q)); e2 += (x - q) ** 2; w2 += x * x; }
+        }
+        err.push(er); scales.push(sc);
+      }
+      return { err, scales, rel: Math.sqrt(e2 / w2), rowBits: C * 4 + (C / gs) * 32 };
+    };
+    const wsvg = $(fig, '[data-v=w]'), esvg = $(fig, '[data-v=e]'), info = $(fig, '[data-v=info]'), store = $(fig, '[data-v=store]'), tab = $(fig, '.sx-gtab');
+    const MAXBITS = C * 4 + 16 * 32;
+    let cur = null, curGs = 64;
+    const draw = () => {
+      const gs = SIZES[state.g], ng = C / gs, st = stats(gs); cur = st; curGs = gs;
+      $(fig, '[data-o=g]').textContent = `${ng} of ${gs}`;
+      let gm = 0; for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) gm = Math.max(gm, Math.abs(val(r, c)));
+      const cells = (svg, h, color) => {
+        const kids = [];
+        for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(mk('rect', { x: c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
+        for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: 0, y2: R * RH, class: 'gl' }));
+        kids.push(mk('rect', { x: 1, y: state.sel * RH + 1, width: C * CW - 2, height: RH - 2, class: 'sel' }));
+        return kids;
+      };
+      const wcol = (r, c) => { const v = val(r, c), p = Math.min(100, Math.abs(v) / 3 * 100); return `color-mix(in srgb, var(${v >= 0 ? '--sx-red' : '--sx-blue'}) ${p}%, var(--bg))`; };
+      const ecol = (r, c) => `color-mix(in srgb, var(--sx-red) ${Math.min(100, st.err[r][c] / .5 * 100)}%, var(--bg))`;
+      const bars = [];
+      st.scales[state.sel].forEach((s, g) => {
+        const h = Math.max(1, s.mx / gm * (BARH - 14)), x0 = g * gs * CW + 1, bw = gs * CW - 2;
+        bars.push(mk('rect', { x: x0, y: R * RH + 4 + BARH - h, width: bw, height: h, class: s.mx > 3 ? 'big' : 'sc' }));
+        if (bw >= 24) { const t = mk('text', { x: x0 + bw / 2, y: R * RH + 4 + BARH - h - 3, 'text-anchor': 'middle', class: 'lbl' }); t.textContent = s.mx.toFixed(1); bars.push(t); }
+      });
+      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH + BARH + 6}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol), ...bars);
+      esvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); esvg.replaceChildren(...cells(esvg, R * RH, ecol));
+      const idx = C * 4, scl = ng * 32;
+      $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
+      store.textContent = `Storage per row: ${C} weights × 4 bits = ${idx} bits, plus ${ng} scale${ng > 1 ? 's' : ''} × 32 bits = ${scl} bits. Total ${st.rowBits} bits (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`;
+      const rows = [['groups per row', 'error', 'bits per row']];
+      SIZES.forEach((sz, i) => { const s2 = stats(sz); rows.push([`${C / sz} of ${sz}`, `${(s2.rel * 100).toFixed(1)}%`, String(s2.rowBits), i]); });
+      tab.replaceChildren(...rows.map((r, i) => { const tr = el('tr'); r.slice(0, 3).forEach((t, j) => tr.append(el(i ? 'td' : 'th', j ? 'num' : null, t))); if (i) { tr.dataset.i = r[3]; if (r[3] === state.g) tr.className = 'on'; } return tr; }));
+    };
+    const pick = (e) => {
+      const rc = wsvg.getBoundingClientRect(), e0 = e.currentTarget === esvg ? esvg.getBoundingClientRect() : rc;
+      const x = (e.clientX - e0.left) / e0.width * C * CW, y = (e.clientY - e0.top) / e0.width * C * CW;
+      return { c: Math.floor(x / CW), r: Math.floor(y / RH) };
+    };
+    [wsvg, esvg].forEach((svg) => {
+      svg.addEventListener('mousemove', (e) => {
+        const p = pick(e); if (p.r < 0 || p.r >= R || p.c < 0 || p.c >= C) return;
+        const g = Math.floor(p.c / curGs), s = cur.scales[p.r][g];
+        info.textContent = `Row ${p.r + 1}, group ${g + 1} of ${C / curGs}: weight ${val(p.r, p.c).toFixed(2)}, largest in group ${s.mx.toFixed(2)}, gap between levels ${s.step.toFixed(2)}, error ${cur.err[p.r][p.c].toFixed(2)}.`;
+      });
+      svg.addEventListener('click', (e) => { const p = pick(e); if (p.r >= 0 && p.r < R) { state.sel = p.r; draw(); } });
+    });
+    tab.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) { state.g = +tr.dataset.i; $(fig, '[data-k=g]').value = state.g; draw(); } });
+    $(fig, '[data-k=g]').addEventListener('input', (e) => { state.g = +e.target.value; draw(); });
+    $(fig, '[data-k=out]').addEventListener('change', (e) => { state.out = e.target.checked; draw(); });
+    $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; gen(); draw(); });
+    info.textContent = 'Hover a cell to see its group.'; gen(); draw();
+  };
+
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();
