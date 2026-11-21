@@ -416,12 +416,15 @@
           grid(o.m, `fill:${col(i)}`, 1.8);
         });
         else { kids.push(square(FLAT, 'stroke:var(--sx-gold);stroke-width:1.6')); grid(FLAT, 'fill:var(--muted)', 2); }
-        P.forEach((p, i) => {                              // an arrow from each group to the grid point it is stored as, from the edge of its dot to the edge of the ring that marks the destination
+        P.forEach((p, i) => {                              // a curved arrow from each group to the grid point it is stored as: it bows toward the middle, off the square's edge that the dot sits on
           const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 22) return;
-          const ux = (x2 - x1) / d, uy = (y2 - y1) / d, sx = x1 + ux * 9, sy = y1 + uy * 9, tx = x2 - ux * 9, ty = y2 - uy * 9, hl = Math.min(11, (d - 18) * .7), bx = tx - ux * hl, by = ty - uy * hl, wd = i === rot.sel ? 3 : 2.2, hw = hl * .45;
-          const tri = `${tx},${ty} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}`;
-          kids.push(line(sx, sy, bx, by, 'snap3', `stroke:var(--bg);stroke-width:${wd + 3.5}`), sv('polygon', { points: tri, class: 'arrh' }, 'fill:var(--bg);stroke:var(--bg);stroke-width:3.5;stroke-linejoin:round'));   // a background-coloured casing, so the arrow reads as lying on top of the edge
-          kids.push(line(sx, sy, bx, by, 'snap3', `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
+          const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; let nx = -(y2 - y1) / d, ny = (x2 - x1) / d; if (nx * (CX - mx) + ny * (CY - my) < 0) { nx = -nx; ny = -ny; }
+          const bow = Math.min(.45 * d, 22), cx = mx + nx * bow * 2, cy = my + ny * bow * 2;      // the control point of a quadratic curve sits twice as far out as the curve's middle
+          const n0 = Math.hypot(cx - x1, cy - y1), u0x = (cx - x1) / n0, u0y = (cy - y1) / n0, n1 = Math.hypot(x2 - cx, y2 - cy), u1x = (x2 - cx) / n1, u1y = (y2 - cy) / n1;
+          const sx = x1 + u0x * 9, sy = y1 + u0y * 9, tx = x2 - u1x * 9, ty = y2 - u1y * 9, hl = Math.min(11, d * .35), bx = tx - u1x * hl, by = ty - u1y * hl, wd = i === rot.sel ? 3 : 2.2, hw = hl * .45;
+          const tri = `${tx},${ty} ${bx - u1y * hw},${by + u1x * hw} ${bx + u1y * hw},${by - u1x * hw}`, path = `M${sx},${sy} Q${cx},${cy} ${bx},${by}`;
+          kids.push(sv('path', { d: path, class: 'arc' }, `stroke:var(--bg);stroke-width:${wd + 3.5}`), sv('polygon', { points: tri, class: 'arrh' }, 'fill:var(--bg);stroke:var(--bg);stroke-width:3.5;stroke-linejoin:round'));   // a background-coloured casing, so the arrow reads as lying on top of anything under it
+          kids.push(sv('path', { d: path, class: 'arc' }, `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
         });
       }
       const bin = (k) => k.toString(2).padStart(2, '0');

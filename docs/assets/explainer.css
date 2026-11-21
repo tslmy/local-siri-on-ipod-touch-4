@@ -303,3 +303,4 @@
 .sx-ol .lossdot { opacity: .95; }
 .sx-ol .gnum { font-weight: bold; font-size: 10px; pointer-events: none; }
 .sx-r2 .crv { stroke-width: 2; }
+.sx-r2 .arc { fill: none; stroke-linecap: round; }
