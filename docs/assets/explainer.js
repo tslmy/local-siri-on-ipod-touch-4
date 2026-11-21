@@ -352,6 +352,13 @@
     if (!sc.base.length) genScene(sc);
     if (fig.dataset.levels) sc.st.mode = fig.dataset.levels;      // a figure can fix the levels option: "fixed" is step 3's one shared grid
     const rot = { deg: 0, sel: 0, follow: false };      // per figure: only the rotation figures turn the groups
+    const anim = { a: 1, raf: 0 }, ease = (t) => (t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);     // how far a trail figure's groups have moved, 0 to 1
+    const play = () => {                                // slide the groups from their real weights to where they are stored
+      cancelAnimationFrame(anim.raf);
+      if (matchMedia('(prefers-reduced-motion: reduce)').matches) { anim.a = 1; draw(); return; }
+      const t0 = performance.now(), step = (t) => { anim.a = Math.min(1, (t - t0) / 1400); draw(); if (anim.a < 1) anim.raf = requestAnimationFrame(step); };
+      anim.a = 0; anim.raf = requestAnimationFrame(step);
+    };
     const CX = 165, CY = 150, S = 100, FLAT = Math.SQRT1_2;   // the fixed grid is sized for a perfectly flat group: both coordinates 0.71
     const GOLD = 'var(--sx-gold)', BLUE = 'var(--sx-blue)';    // with an outlier / without, as in the loss figure of step 2
     const svg = $(fig, 'svg.sx-r2'), note = $(fig, '.sx-readout');
@@ -438,15 +445,16 @@
         if (Math.hypot(x - px, y - py) >= 22) kids.push(word(x, y + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', `fill:${col(i)};dominant-baseline:central`));
       });
       if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(shape(grp[i].outlier, cx, cy, 7, 'ghost', `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
-      const trail = has('trail');                        // with a trail, each group is drawn once, where it is stored, with fading shadows back along the way it moved from its real weights
+      const trail = has('trail'), e = trail ? ease(anim.a) : 1;   // with a trail, each group is drawn once, at its place on the way from its real weights to where it is stored, with fading shadows behind it
       if (trail) P.forEach((p, i) => {
-        const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 4) return;
+        const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1) * e; if (d < 4) return;
         const n = Math.max(3, Math.min(7, Math.round(d / 8)));
-        for (let k = 0; k < n; k++) { const t = k / n; kids.push(shape(grp[i].outlier, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, 8, 'shadow', `fill:${col(i)};opacity:${(.12 + .5 * t).toFixed(2)}`)); }   // the faintest one is where the group really is
+        for (let k = 0; k < n; k++) { const t = k / n; kids.push(shape(grp[i].outlier, x1 + (x2 - x1) * e * t, y1 + (y2 - y1) * e * t, 8, 'shadow', `fill:${col(i)};opacity:${(.12 + .5 * t).toFixed(2)}`)); }   // the faintest one is where the group really is
       });
-      P.forEach((p, i) => { const at = trail ? Q[i].q : p, [cx, cy] = pt(at[0], at[1]); kids.push(shape(grp[i].outlier, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
-      P.forEach((p, i) => { const at = trail ? Q[i].q : p, [cx, cy] = pt(at[0], at[1]); kids.push(word(cx, cy + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
-      if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // the stored value of each group; flips inwards near the edges so the label stays in view
+      const at = (p, i) => (trail ? [p[0] + (Q[i].q[0] - p[0]) * e, p[1] + (Q[i].q[1] - p[1]) * e] : p);
+      P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(shape(grp[i].outlier, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
+      P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(word(cx, cy + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
+      if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)};opacity:${(e ** 3).toFixed(2)}`)); });   // the stored value of each group; flips inwards near the edges so the label stays in view
       let curves = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle: one curve for each kind of group
         const spike = (flag) => (d) => { const g2 = grp.filter((g) => g.outlier === flag); return mean(g2.map((g) => { const q = turn2(g.dir, d); return Math.max(Math.abs(q[0]), Math.abs(q[1])); })); };
@@ -485,10 +493,12 @@
     on('[data-k=deg]', 'input', (e) => set(+e.target.value));
     on('[data-act=had]', 'click', () => set(45));
     on('[data-act=reset]', 'click', () => set(0));
+    on('[data-act=replay]', 'click', play);
     on('[data-act=follow]', 'click', (e) => { rot.follow = !rot.follow; e.currentTarget.setAttribute('aria-pressed', String(rot.follow)); draw(); });
     if (svg) svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null) { rot.sel = +i; draw(); } });
     { const n = $(fig, '[data-o=n]'); if (n) n.textContent = sc.st.n; }
     if ($(fig, '[data-k=deg]')) set(0); else draw();
+    if (has('trail') && svg && 'IntersectionObserver' in window) new IntersectionObserver((es, ob) => { if (es[0].isIntersecting) { ob.disconnect(); play(); } }, { threshold: .6 }).observe(svg);   // play once when the figure is first in view
   };
 
   // 6a. Rotating points in 3D: the cube of levels shrinks as spikes flatten
