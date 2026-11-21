@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=53" />
+    <link rel="stylesheet" href="assets/explainer.css?v=54" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -301,7 +301,7 @@
 
 <figure class="widget wide" data-widget="outlierloss">
   <figcaption><strong>Groups with an outlier lose more.</strong> It follows the matrix and the groups per row you chose above, and "New matrix", "Groups with outliers" and "Outlier size" change it too.</figcaption>
-  <svg class="sx-ol" viewBox="0 0 640 200" role="img" aria-label="Average rounding error of each group, split into groups that contain an outlier and groups that do not"></svg>
+  <svg class="sx-ol" viewBox="0 0 640 200" role="img" aria-label="Average rounding error of each group, split into the first half of the groups, closer to an axis, and the second half, closer to a diagonal"></svg>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
@@ -311,16 +311,15 @@
 <li>But you can change the axes you write them against.</li>
 </ul>
 
-<p>To visualize axes, let's consider the smallest case: groups of just 2 weights. Below is a row of weights cut into groups of two, like the one in the previous figure and at the same cell size. First, make up some groups:</p>
+<p>To visualize axes, let's consider the smallest case: groups of just 2 weights. Below is a row of weights cut into groups of two, like the one in the previous figure and at the same cell size. The groups run from a short one on an axis to a long one on a diagonal:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="strips">
   <figcaption><strong>Groups of two weights.</strong> Each group has a number and a color, so that you can follow it through the figures below.</figcaption>
-  <div class="sx-rowlabel sx-block">Mock groups</div>
+  <div class="sx-rowlabel sx-block">Groups</div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
-    <button data-act="new">new points</button>
-  </div>
-  <p class="sx-hint">Half of the groups have an outlier (triangles): a big weight and a small one. The other half do not (circles): two weights of about the same size. The number of groups goes up in twos, one of each kind.</p>
+      </div>
+  <p class="sx-hint">The first group is short and lies on an axis. The last is long and lies on a diagonal. The groups in between are spread evenly from one to the other, and the number of groups goes up in twos. The first half are closer to an axis (spiky, triangles) and the second half closer to a diagonal (flat, circles).</p>
   <div class="sx-trip">
     <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups as a row of cells, with each group's scale printed on it"></svg><p class="sx-hint">Weights, with each group's scale printed on it</p></div>
     <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the scale of each group"></svg><p class="sx-hint">Scale of each group, its largest weight (the more gold, the larger)</p></div>
@@ -331,7 +330,7 @@
 <p>Each group is just two numbers, <em>w</em><sub>1</sub> and <em>w</em><sub>2</sub>, so it can also be read as a point on a plane: the first weight is its horizontal coordinate and the second weight is its vertical one. Here are the same groups drawn that way, with the same numbers and colors:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points">
-  <figcaption><strong>Groups as points.</strong> Each marker is one group, placed at (<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>): triangles have an outlier, circles do not. Change the mock groups above and the markers move.</figcaption>
+  <figcaption><strong>Groups as points.</strong> Each marker is one group, placed at (<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>): triangles are the first half (closer to an axis), circles the second half (closer to a diagonal). Change the number of groups above and the markers move.</figcaption>
   <svg class="sx-r2" viewBox="0 0 330 300" style="max-width:34rem" role="img" aria-label="Each group of two weights drawn as a point, with the first weight on the horizontal axis and the second on the vertical axis"></svg>
 </figure>
 
@@ -347,12 +346,12 @@
   <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Each of the 16 grid points is a possible stored value. Each solid marker sits where its group is stored, with a trail of shadows behind it back to the group's real weights, and the label next to it gives that stored value, the two level numbers in binary (2 bits per weight). The selected group's levels are numbered along its square. Click a marker to select a group and make its square and outline thicker.</figcaption>
   <div class="sx-controls"><button data-act="replay">replay the movement</button></div>
   <svg class="sx-r2" viewBox="0 -8 330 322" style="max-width:34rem" role="img" aria-label="Groups as points with the square of quantization levels and the grid, each drawn where it is stored, with a trail of fading shadows back to its real weights"></svg>
-  <p class="sx-cap2">Here is how much each group loses to rounding, the length of its trail as a share of the group's length, split into groups with an outlier and the rest, as in the earlier figure of this step:</p>
-  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group, split into groups that contain an outlier and groups that do not"></svg>
+  <p class="sx-cap2">Here is how much each group loses to rounding, the length of its trail as a share of the group's length, split into the first half (closer to an axis) and the second half (closer to a diagonal):</p>
+  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group, split into the first half of the groups, closer to an axis, and the second half, closer to a diagonal"></svg>
   <p class="sx-note" data-v="lossnote" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>Now rotate the groups. The two curves show, at every angle, the largest weight as a share of the group's length, averaged over the groups with an outlier (gold) and over the groups without (blue). Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
+<p>Now rotate the groups. The two curves show, at every angle, the largest weight as a share of the group's length, averaged over the first half of the groups, which are spiky (gold), and over the second half, which are flat (blue). Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant ghost curve loss" data-toggles="squares:Squares;grid:Grid points;pre:Pre-rotation locations;start:Rotated locations (start);end:Stored locations (end);trail:Arrows">
   <figcaption><strong>Rotating groups of two weights.</strong> Dashed outlines mark where the groups started, filled markers are where the rotation has taken them, and solid outlines are where each group is stored.</figcaption>
@@ -364,17 +363,18 @@
   </div>
   <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Groups as points with their squares of levels, and a curve of average spikiness against rotation angle"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
-  <p class="sx-cap2">And here is how much each group loses to rounding at the current angle, split into groups with an outlier and the rest. Turn the angle and watch the two rows move:</p>
-  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group at the current angle, split into groups that contain an outlier and groups that do not"></svg>
+  <p class="sx-cap2">And here is how much each group loses to rounding at the current angle, split into the first half (spiky) and the second half (flat). Turn the angle and watch the two rows move:</p>
+  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group at the current angle, split into the first half of the groups, closer to an axis, and the second half, closer to a diagonal"></svg>
   <p class="sx-note" data-v="lossnote" aria-live="polite">&nbsp;</p>
   <p class="sx-note">The rotation slider is only an animation: in practice a rotation is applied once, all at once.</p>
 </figure>
 
-<p>So a rotation helps groups with an outlier and hurts groups without one. That raises a natural question: how do we tell which kind a group is?</p>
+<p>So a rotation helps spiky groups and hurts flat ones. That raises a natural question: how do we tell which kind a group is?</p>
 <ul>
-<li><strong>There is no sharp definition.</strong> An outlier is a weight that is large compared with the others in its group, and "large" is a matter of degree. A weight twice the size of its neighbours may or may not count.</li>
-<li><strong>In practice we use a heuristic.</strong> Compare the group's largest weight with its overall size, and call it an outlier group if that ratio is far bigger than a group of ordinary weights would give.</li>
-<li><strong>Whistle does not try to tell.</strong> The converter applies the same rotation to every group. Whether that is a good bet depends on how many groups have outliers and on how many weights each group has, which is where we are heading.</li>
+<li><strong>There is no sharp line between spiky and flat.</strong> In our figure the groups change gradually from sitting on an axis to sitting on a diagonal, and real groups do the same: how spiky a group is runs on a scale.</li>
+<li><strong>A spiky group usually has one weight much larger than the rest.</strong> That weight is called an outlier, and it is what to look for in a real layer.</li>
+<li><strong>In practice we use a heuristic.</strong> Compare the group's largest weight with its overall size, and call the group spiky if that ratio is far bigger than ordinary weights would give.</li>
+<li><strong>Whistle does not try to tell.</strong> The converter applies the same rotation to every group. Whether that is a good bet depends on how many groups are spiky and on how many weights each group has, which is where we are heading.</li>
 </ul>
 
 <details class="detour">
@@ -397,7 +397,7 @@
 </table></div>
 <p>A reasonable rule of thumb is to say a group of 64 has an outlier if its crest factor is above about 4: a weight more than four times the typical size, rarer than 1 group in 100 among ordinary ones. The threshold is a choice. The useful readout is the share of groups above it, measured layer by layer.</p>
 <ul>
-<li>In two dimensions the crest factor can never exceed \(\sqrt{2}\), so a rule like this has no bite. Our two kinds of group are drawn that way by construction, near an axis or near a diagonal.</li>
+<li>In two dimensions the crest factor can never exceed \(\sqrt{2}\), so a rule like this has no bite. Our groups are spiky or flat only because of where we placed them.</li>
 <li>With more weights the gap between a flat group and a spike grows, which is why outliers only become a sharp problem for bigger groups.</li>
 </ul>
 </details>
@@ -539,11 +539,10 @@ Here are the entries of these matrices, before the scaling:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="had" data-layers="points quant ghost curve" data-had="1">
   <figcaption><strong>The Hadamard angle.</strong> The same two kinds of group as before, now with the Hadamard matrix marked on the curves and shown next to the rotation matrix. Rotate:</figcaption>
-  <div class="sx-rowlabel sx-block">Mock groups</div>
+  <div class="sx-rowlabel sx-block">Groups</div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
-    <button data-act="new">new points</button>
-  </div>
+      </div>
   <div class="sx-rowlabel sx-block">Rotation</div>
   <div class="sx-controls">
     <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
@@ -558,8 +557,8 @@ Here are the entries of these matrices, before the scaling:</p>
   <div class="callout">
     <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and the two curves show which:
     <ul>
-    <li><strong>Groups with one big weight (an outlier), the triangles.</strong> They start near an axis, as far from 45° as possible, so turning by 45° brings them to the flat direction. The gold curve is lowest at 45°.</li>
-    <li><strong>Groups without an outlier, the circles.</strong> They start near a diagonal, so they are already flat, and 45° turns them into spikes. The blue curve peaks at 45°.</li>
+    <li><strong>Spiky groups, the triangles (first half).</strong> They start near an axis, as far from 45° as possible, so turning by 45° brings them to the flat direction. The gold curve is lowest at 45°.</li>
+    <li><strong>Flat groups, the circles (second half).</strong> They start near a diagonal, so they are already flat, and 45° turns them into spikes. The blue curve peaks at 45°.</li>
     </ul>
     With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
   </div>
@@ -589,12 +588,11 @@ Here are the entries of these matrices, before the scaling:</p>
 <p>Here is that idea on the two-weight groups from step 2. The length of each group is divided out, so the dots sit on a circle of length 1, and one grid is shared by every group:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="step3" data-layers="strips points quant ghost curve" data-levels="fixed">
-  <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Rotate the groups and watch the arrows: they shrink for the triangles (groups with an outlier) as those get flatter, and grow for the circles:</figcaption>
-  <div class="sx-rowlabel sx-block">Mock groups</div>
+  <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Rotate the groups and watch the arrows: they shrink for the triangles (the spiky first half) as those get flatter, and grow for the circles (the flat second half):</figcaption>
+  <div class="sx-rowlabel sx-block">Groups</div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
-    <button data-act="new">new points</button>
-  </div>
+      </div>
   <div class="sx-trip">
     <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups with the length divided out, with each group's length printed on it"></svg><p class="sx-hint">Weights with the length divided out, and each group's length (its scale) printed on it</p></div>
     <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the length of each group"></svg><p class="sx-hint">Scale of each group, its length (the more gold, the larger)</p></div>
@@ -755,6 +753,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=60" defer></script>
+    <script src="assets/explainer.js?v=62" defer></script>
   </body>
 </html>

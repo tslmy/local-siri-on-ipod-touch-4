@@ -336,20 +336,16 @@
 
   // 6-. Groups of two weights, in stages. Figures with the same data-scene share their mock groups (and the levels option); data-layers says what each one draws:
   // strips (three lines of cells), points, quant (squares, grids, arrows and rings), bits (binary labels), ghost (where the groups started), curve (spikiness against angle), loss (how much each group loses).
-  // There are always two kinds of group: with an outlier (a big weight and a small one, drawn as a triangle) and without (two weights of similar size, drawn as a circle); half of each.
   // A group has a direction and a length; its two weights are length times (cos, sin). With "one fixed grid" the length is divided out, so the dots sit on a circle of length 1.
   const rng2 = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
   const turn2 = (p, d) => { const c = Math.cos(d * Math.PI / 180), s = Math.sin(d * Math.PI / 180); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c]; };
   const scenes = {};
-  const genScene = (sc) => {   // groups alternate: with an outlier, without, ...; lengths from 0.35 to 1.35, spread in golden-ratio steps so that any first few groups differ clearly
-    const r = rng2(sc.st.seed), r0 = r(); sc.base = [];
-    for (let i = 0; i < 8; i++) sc.base.push({ outlier: i % 2 === 0, k: i >> 1, u: (r() - .5) * 2, len: .35 + ((r0 + i * .618034) % 1) });
-  };
-  const groupsOf = (sc) => sc.base.slice(0, sc.st.n).map(({ outlier, k, u, len }) => { const a = (k * 90 + (outlier ? 0 : 45) + u * 10) * Math.PI / 180; return { dir: [Math.cos(a), Math.sin(a)], len, outlier }; });   // near an axis, or near a diagonal (within 10 degrees)
+  // The groups run from one extreme to the other: the first is short and lies on an axis, the last is long and lies on a diagonal, and the groups in between are spread evenly
+  // in length (0.35 to 1.35) and in direction (0 to 45 degrees). The first half are closer to an axis ("spiky", triangles), the second half closer to a diagonal ("flat", circles).
+  const groupsOf = (sc) => { const n = sc.st.n; return Array.from({ length: n }, (_, i) => { const t = n > 1 ? i / (n - 1) : 0, a = 45 * t * Math.PI / 180; return { dir: [Math.cos(a), Math.sin(a)], len: .35 + t, spiky: i < n / 2 }; }); };
   const rot2dFig = (fig) => {
     const had = fig.hasAttribute('data-had'), layers = (fig.dataset.layers || 'points').split(/\s+/), has = (l) => layers.includes(l);
-    const sc = scenes[fig.dataset.scene || 'main'] || (scenes[fig.dataset.scene || 'main'] = { st: { n: 4, mode: 'plain', seed: 4 }, base: [], subs: [] });
-    if (!sc.base.length) genScene(sc);
+    const sc = scenes[fig.dataset.scene || 'main'] || (scenes[fig.dataset.scene || 'main'] = { st: { n: 4, mode: 'plain' }, subs: [] });
     if (fig.dataset.levels) sc.st.mode = fig.dataset.levels;      // a figure can fix the levels option: "fixed" is step 3's one shared grid
     const rot = { deg: 0, sel: 0, follow: false };      // per figure: only the rotation figures turn the groups
     const vis = {}, v = (k) => vis[k] !== false;         // which elements are shown: switched from the row of toggles above the plot
@@ -361,7 +357,7 @@
       anim.a = 0; anim.raf = requestAnimationFrame(step);
     };
     const CX = 165, CY = 150, S = 100, FLAT = Math.SQRT1_2;   // the fixed grid is sized for a perfectly flat group: both coordinates 0.71
-    const GOLD = 'var(--sx-gold)', BLUE = 'var(--sx-blue)';    // with an outlier / without, as in the loss figure of step 2
+    const GOLD = 'var(--sx-gold)', BLUE = 'var(--sx-blue)';    // first half (spiky) / second half (flat)
     const svg = $(fig, 'svg.sx-r2'), note = $(fig, '.sx-readout');
     const on = (sel, ev, fn) => { const e = $(fig, sel); if (e) e.addEventListener(ev, fn); };
     const everyone = () => sc.subs.forEach((f) => f());
@@ -381,7 +377,7 @@
       if (tw) {                                          // three lines of cells at the cell size of the grouping figure, growing to the right: weights with their scales, the scales, the rounding errors
         const CW2 = 10, RH2 = 11, BAND = 15, scl = Q.map((o, i) => (md === 'plain' ? o.m : grp[i].len)), smax = Math.max(...scl), line1 = { R: 1, C: 2 * N, CW: CW2, RH: RH2, gs: 2, rows: false };
         const w = (c) => P[c >> 1][c & 1], q = (c) => Q[c >> 1].q[c & 1];
-        const chips = P.flatMap((p, i) => { const g = shape(grp[i].outlier, (i + .5) * 2 * CW2, 7, 5.5, '', `fill:${col(i)}`), t = sv('text', { x: (i + .5) * 2 * CW2, y: 7.3 + (grp[i].outlier ? 1.5 : 0), 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gnum2' }); t.textContent = i + 1; return [g, t]; });
+        const chips = P.flatMap((p, i) => { const g = shape(grp[i].spiky, (i + .5) * 2 * CW2, 7, 5.5, '', `fill:${col(i)}`), t = sv('text', { x: (i + .5) * 2 * CW2, y: 7.3 + (grp[i].spiky ? 1.5 : 0), 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gnum2' }); t.textContent = i + 1; return [g, t]; });
         const put = (svgEl, h, kids) => { svgEl.setAttribute('viewBox', `0 0 640 ${h}`); svgEl.replaceChildren(...kids); };
         const shifted = sv('g', { transform: `translate(0,${BAND})` }); shifted.append(...matrixCells({ ...line1, color: (r, c) => divColor(w(c), md === 'plain' ? 1.5 : 1), label: (r, g) => scl[g].toFixed(2) }));
         put(tw, BAND + RH2, [...chips, shifted]);
@@ -390,21 +386,21 @@
       }
       const lossSvg = $(fig, '[data-v=loss]');
       if (lossSvg) {                                     // how much each group loses, split into groups with an outlier and the rest (like the figure in step 2)
-        const kids = [], rows = [['With an outlier', true, 52], ['Without', false, 118]], top = has('curve') ? .6 : Math.max(...Q.map((o) => o.err)) * 1.2, x0 = 170, x1 = 620, X = (v) => x0 + (x1 - x0) * v / top;
+        const kids = [], rows = [['First half', 'closer to an axis (spiky)', true, 52], ['Second half', 'closer to a diagonal (flat)', false, 118]], top = has('curve') ? .6 : Math.max(...Q.map((o) => o.err)) * 1.2, x0 = 200, x1 = 620, X = (v) => x0 + (x1 - x0) * v / top;
         const word = (x, y, str, anchor, cls, style) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }, style); t.textContent = str; return t; };
         kids.push(sv('line', { x1: x0, x2: x1, y1: 158, y2: 158, class: 'ax' }));
         const step = top > .5 ? .2 : top > .25 ? .1 : .05;
         for (let v = 0; v <= top; v += step) { kids.push(sv('line', { x1: X(v), x2: X(v), y1: 158, y2: 163, class: 'ax' })); kids.push(word(X(v), 176, pc(v), 'middle')); }
         kids.push(word((x0 + x1) / 2, 194, "rounding error of the group, as a share of its length", 'middle'));
-        rows.forEach(([name, flag, y]) => {
-          const list = Q.map((o, i) => ({ i, loss: o.err })).filter((g) => grp[g.i].outlier === flag);
-          kids.push(word(10, y - 4, name, 'start', 'lbl rowname'), word(10, y + 12, `${list.length} group${list.length === 1 ? '' : 's'}`, 'start'));
+        rows.forEach(([name, sub, flag, y]) => {
+          const list = Q.map((o, i) => ({ i, loss: o.err })).filter((g) => grp[g.i].spiky === flag);
+          kids.push(word(10, y - 8, name, 'start', 'lbl rowname'), word(10, y + 7, sub, 'start'), word(10, y + 22, `${list.length} group${list.length === 1 ? '' : 's'}`, 'start'));
           list.forEach((g, k) => { const cx = X(g.loss), cy = y + ((k % 3) - 1) * 20; kids.push(shape(flag, cx, cy, 8, 'lossdot', `fill:${col(g.i)}`)); const t = word(cx, cy + inside(flag), g.i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central'); kids.push(t); });
           const mu = mean(list.map((g) => g.loss)); kids.push(sv('line', { x1: X(mu), x2: X(mu), y1: y - 38, y2: y + 38, class: 'mean' }), word(X(mu), y - 42, 'mean ' + pc(mu), 'middle', 'lbl meant'));
         });
         lossSvg.replaceChildren(...kids);
-        const ln = $(fig, '[data-v=lossnote]'), mw = mean(Q.filter((o, i) => grp[i].outlier).map((o) => o.err)), mo = mean(Q.filter((o, i) => !grp[i].outlier).map((o) => o.err));
-        if (ln) ln.textContent = `Groups with an outlier (triangles) lose ${pc(mw)} of their length on average, the others (circles) ${pc(mo)}. That is ${(mw / mo).toFixed(1)} times as much.`;
+        const ln = $(fig, '[data-v=lossnote]'), mw = mean(Q.filter((o, i) => grp[i].spiky).map((o) => o.err)), mo = mean(Q.filter((o, i) => !grp[i].spiky).map((o) => o.err));
+        if (ln) ln.textContent = `The first half (spiky, triangles) lose ${pc(mw)} of their length on average, the second half (flat, circles) ${pc(mo)}.${mo < .005 ? ' The flat groups lose almost nothing.' : mw >= mo * 1.05 ? ` The spiky ones lose ${(mw / mo).toFixed(1)} times as much.` : mo >= mw * 1.05 ? ` Now the flat ones lose more: ${(mo / mw).toFixed(1)} times as much.` : ' About the same.'}`;
       }
       if (!svg) return;
       const kids = [], sel = P[rot.sel], { m, err } = Q[rot.sel];
@@ -442,24 +438,24 @@
       }
       if (has('quant') && !has('trail') && v('end')) Q.forEach((o, i) => {   // a hollow marker where each group is stored: the dot moved there
         const [x, y] = pt(o.q[0], o.q[1]), [px, py] = pt(P[i][0], P[i][1]);
-        kids.push(shape(grp[i].outlier, x, y, 8, 'dest', `stroke:${col(i)};stroke-width:${i === rot.sel ? 3 : 2}`));
-        if (Math.hypot(x - px, y - py) >= 22) kids.push(word(x, y + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', `fill:${col(i)};dominant-baseline:central`));
+        kids.push(shape(grp[i].spiky, x, y, 8, 'dest', `stroke:${col(i)};stroke-width:${i === rot.sel ? 3 : 2}`));
+        if (Math.hypot(x - px, y - py) >= 22) kids.push(word(x, y + inside(grp[i].spiky), i + 1, 'middle', 'lbl gnum', `fill:${col(i)};dominant-baseline:central`));
       });
-      if (has('ghost') && v('pre')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(shape(grp[i].outlier, cx, cy, 7, 'ghost', `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
+      if (has('ghost') && v('pre')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(shape(grp[i].spiky, cx, cy, 7, 'ghost', `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
       const trail = has('trail'), e = trail ? ease(anim.a) : 1;   // with a trail, each group is drawn once, at its place on the way from its real weights to where it is stored, with fading shadows behind it
       if (trail) P.forEach((p, i) => {
         const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1) * e; if (d < 4) return;
         const n = Math.max(3, Math.min(7, Math.round(d / 8)));
-        for (let k = 0; k < n; k++) { if (!(k === 0 ? v('start') : v('trail'))) continue; const t = k / n; kids.push(shape(grp[i].outlier, x1 + (x2 - x1) * e * t, y1 + (y2 - y1) * e * t, 8, 'shadow', `fill:${col(i)};opacity:${(.12 + .5 * t).toFixed(2)}`)); }   // the faintest one is where the group really is
+        for (let k = 0; k < n; k++) { if (!(k === 0 ? v('start') : v('trail'))) continue; const t = k / n; kids.push(shape(grp[i].spiky, x1 + (x2 - x1) * e * t, y1 + (y2 - y1) * e * t, 8, 'shadow', `fill:${col(i)};opacity:${(.12 + .5 * t).toFixed(2)}`)); }   // the faintest one is where the group really is
       });
       const at = (p, i) => (trail ? [p[0] + (Q[i].q[0] - p[0]) * e, p[1] + (Q[i].q[1] - p[1]) * e] : p);
       const showMarker = trail ? v('end') : v('start');   // the solid marker is where a group is stored (trail figure) or where it is after the rotation (the others)
-      if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(shape(grp[i].outlier, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
-      if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(word(cx, cy + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
+      if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(shape(grp[i].spiky, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
+      if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(word(cx, cy + inside(grp[i].spiky), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
       if (has('bits') && v('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)};opacity:${(e ** 3).toFixed(2)}`)); });   // the stored value of each group; flips inwards near the edges so the label stays in view
       let curves = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle: one curve for each kind of group
-        const spike = (flag) => (d) => { const g2 = grp.filter((g) => g.outlier === flag); return mean(g2.map((g) => { const q = turn2(g.dir, d); return Math.max(Math.abs(q[0]), Math.abs(q[1])); })); };
+        const spike = (flag) => (d) => { const g2 = grp.filter((g) => g.spiky === flag); return mean(g2.map((g) => { const q = turn2(g.dir, d); return Math.max(Math.abs(q[0]), Math.abs(q[1])); })); };
         const cW = Array.from({ length: 91 }, (_, d) => spike(true)(d)), cO = Array.from({ length: 91 }, (_, d) => spike(false)(d)); curves = { cW, cO };
         const x0 = 410, x1 = 620, y0 = 250, y1 = 50, lo = .65, top = 1.02, CXa = (d) => x0 + (x1 - x0) * d / 90, CYa = (e) => y0 - (y0 - y1) * (e - lo) / (top - lo);
         kids.push(line(x0, y0, x1, y0, 'ax'), line(x0, y0, x0, y1, 'ax'));
@@ -469,14 +465,14 @@
         (had ? [0, 45, 90] : [0, 90]).forEach((d) => kids.push(word(CXa(d), y0 + 15, d + '°', 'middle')));
         [.7, .85, 1].forEach((v) => kids.push(line(x0 - 4, CYa(v), x0, CYa(v), 'ax'), word(x0 - 8, CYa(v) + 4, (v * 100).toFixed(0) + '%', 'end')));
         if (had) kids.push(word(CXa(45), y1 - 8, 'Hadamard', 'middle', 'lbl hadt'));
-        kids.push(shape(true, x0 - 32, 32, 6, 'ghost', `stroke:${GOLD};stroke-dasharray:none`), word(x0 - 22, 36, 'with an outlier', 'start'), shape(false, x0 + 82, 32, 6, 'ghost', `stroke:${BLUE};stroke-dasharray:none`), word(x0 + 92, 36, 'without', 'start'));   // the legend sits above the plot, clear of the curves
+        kids.push(shape(true, x0 - 32, 32, 6, 'ghost', `stroke:${GOLD};stroke-dasharray:none`), word(x0 - 22, 36, 'first half (spiky)', 'start'), shape(false, x0 + 96, 32, 6, 'ghost', `stroke:${BLUE};stroke-dasharray:none`), word(x0 + 106, 36, 'second half (flat)', 'start'));   // the legend sits above the plot, clear of the curves
         kids.push(word(x0 - 40, y1 - 38, 'largest weight ÷ length (average)', 'start'), word((x0 + x1) / 2, y0 + 30, 'rotation angle', 'middle'));
       }
       svg.replaceChildren(...kids);
       if (!note || !curves) return;
-      const avgErr = (flag) => (d) => mean(grp.filter((g) => g.outlier === flag).map((g) => quant(turn2(g.dir, d).map((x) => x * (md === 'plain' ? g.len : 1)), md).err));
+      const avgErr = (flag) => (d) => mean(grp.filter((g) => g.spiky === flag).map((g) => quant(turn2(g.dir, d).map((x) => x * (md === 'plain' ? g.len : 1)), md).err));
       const set = (flag, name, c) => `${name}: largest weight ${pc(c[rot.deg])} of the length (${pc(c[0])} before${had ? `, ${pc(c[45])} at 45°` : ''}), rounding error ${pc(avgErr(flag)(rot.deg))} (${pc(avgErr(flag)(0))} before${had ? `, ${pc(avgErr(flag)(45))} at 45°` : ''})`;
-      note.textContent = `Rotated ${rot.deg}°. Group ${rot.sel + 1} (${grp[rot.sel].outlier ? 'with' : 'without'} an outlier): (${sel[0].toFixed(2)}, ${sel[1].toFixed(2)}), largest weight ${pc(Math.max(...sel.map(Math.abs)) / Math.hypot(...sel))} of its length, rounding error ${pc(err)}. On average, ${set(true, 'groups with an outlier (triangles)', curves.cW)}; ${set(false, 'groups without (circles)', curves.cO)}. ${md === 'plain' ? 'Each group has its own square, reaching its largest weight.' : 'Every group shares the one fixed grid.'}`;
+      note.textContent = `Rotated ${rot.deg}°. Group ${rot.sel + 1} (${grp[rot.sel].spiky ? 'spiky' : 'flat'}): (${sel[0].toFixed(2)}, ${sel[1].toFixed(2)}), largest weight ${pc(Math.max(...sel.map(Math.abs)) / Math.hypot(...sel))} of its length, rounding error ${pc(err)}. On average, ${set(true, 'first half (spiky, triangles)', curves.cW)}; ${set(false, 'second half (flat, circles)', curves.cO)}. ${md === 'plain' ? 'Each group has its own square, reaching its largest weight.' : 'Every group shares the one fixed grid.'}`;
       const box = $(fig, '.sx-mat');
       if (box) {
         const c = Math.cos(rot.deg * Math.PI / 180), sn = Math.sin(rot.deg * Math.PI / 180), h = Math.SQRT1_2;
@@ -494,7 +490,6 @@
     // mock groups and levels: shared by every figure of the scene
     on('[data-k=n]', 'input', (e) => { sc.st.n = +e.target.value; $(fig, '[data-o=n]').textContent = sc.st.n; everyone(); });
     fig.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { sc.st.mode = b.dataset.mode; fig.querySelectorAll('[data-mode]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); everyone(); }));
-    on('[data-act=new]', 'click', () => { sc.st.seed = (sc.st.seed * 48271) % 2147483647; genScene(sc); everyone(); });
     // rotation: per figure
     const set = (d) => { rot.deg = d; $(fig, '[data-k=deg]').value = d; $(fig, '[data-o=deg]').textContent = d + '°'; draw(); };
     on('[data-k=deg]', 'input', (e) => set(+e.target.value));
