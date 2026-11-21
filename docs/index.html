@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=43" />
+    <link rel="stylesheet" href="assets/explainer.css?v=44" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -349,12 +349,7 @@
 </ul>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant">
-  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own color. Click a dot to make its square and arrow thicker. Choose how the levels are placed:</figcaption>
-  <div class="sx-rowlabel sx-block">Levels</div>
-  <div class="sx-opts">
-    <button data-mode="plain" aria-pressed="true"><strong>Reach each group's largest weight</strong><span>Step 1: every group has its own scale, so each gets its own square in its own color, drawn to just reach its largest coordinate, with the evenly spaced levels of plain quantization. Groups that are alike have nearly the same square, so they can lie on top of each other: a colored chip above each square's top-left corner counts them.</span></button>
-    <button data-mode="fixed" aria-pressed="false"><strong>One fixed grid for all groups</strong><span>Step 3's idea: the length is divided out, so the dots sit on a circle of length 1, and one grid (a single gold square) is shared by every group, here sized for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed too, but Gaussian-shaped and built for groups of 64.</span></button>
-  </div>
+  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Groups that are alike have nearly the same square, so they can lie on top of each other: a colored chip above each square's top-left corner counts them. Click a dot to make its square and arrow thicker.</figcaption>
   <svg class="sx-r2" viewBox="0 0 330 300" style="max-width:34rem" role="img" aria-label="Groups as points with the square of quantization levels, the grid, and an arrow from each point to the grid point it is stored as"></svg>
 </figure>
 
@@ -708,6 +703,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=45" defer></script>
+    <script src="assets/explainer.js?v=46" defer></script>
   </body>
 </html>
