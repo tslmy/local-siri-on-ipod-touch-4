@@ -1017,7 +1017,86 @@
     groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, rot2d: rot2dFig, rot3dg: rot3dgFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  // 10. Lloyd's algorithm, step by step: the levels start evenly spaced and move to where the values are
+  const lloydFig = (fig) => {
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-readout'), N = 4000, st = { bits: 2, step: 0 };
+    const r = rng2(11), gs = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+    const xs = Array.from({ length: N }, gs), BINS = 61, LO = -4, HI = 4, hist = new Array(BINS).fill(0);
+    xs.forEach((x) => { const b = Math.floor((x - LO) / (HI - LO) * BINS); if (b >= 0 && b < BINS) hist[b]++; });
+    let levels = [], errs = [], timer = 0;
+    const mse = (lv) => xs.reduce((a, x) => { let m = 1e9; for (const l of lv) m = Math.min(m, (x - l) ** 2); return a + m; }, 0) / N;
+    const init = () => { clearInterval(timer); const L = 2 ** st.bits; levels = Array.from({ length: L }, (_, k) => -3 + k * 6 / (L - 1)); errs = [mse(levels)]; st.step = 0; };
+    const step = () => {
+      const L = levels.length, sum = new Array(L).fill(0), cnt = new Array(L).fill(0);
+      xs.forEach((x) => { let bi = 0, bd = 1e9; levels.forEach((l, k) => { const d = (x - l) ** 2; if (d < bd) { bd = d; bi = k; } }); sum[bi] += x; cnt[bi]++; });
+      const next = levels.map((l, k) => (cnt[k] ? sum[k] / cnt[k] : l)), moved = Math.max(...next.map((l, k) => Math.abs(l - levels[k])));
+      levels = next; errs.push(mse(levels)); st.step++; return moved;
+    };
+    const X = (v) => 20 + (v - LO) / (HI - LO) * 600, top = Math.max(...hist), word = (x, y, t, a, c) => { const e = sv('text', { x, y, 'text-anchor': a, class: c || 'lbl' }); e.textContent = t; return e; };
+    const draw = () => {
+      const kids = [], bw = 600 / BINS;
+      hist.forEach((c, i) => { const h = c / top * 110; kids.push(sv('rect', { x: 20 + i * bw + 1, y: 150 - h, width: bw - 2, height: h, class: 'bar' })); });
+      kids.push(sv('line', { x1: 20, x2: 620, y1: 150, y2: 150, class: 'ax' }));
+      for (let v = -3; v <= 3; v++) { kids.push(sv('line', { x1: X(v), x2: X(v), y1: 150, y2: 155, class: 'ax' }), word(X(v), 170, v, 'middle')); }
+      kids.push(word(320, 190, 'value (in units of the typical size of a weight)', 'middle'));
+      for (let k = 0; k < levels.length - 1; k++) { const cut = (levels[k] + levels[k + 1]) / 2; kids.push(sv('line', { x1: X(cut), x2: X(cut), y1: 30, y2: 150, class: 'cut' })); }
+      levels.forEach((l) => kids.push(sv('line', { x1: X(l), x2: X(l), y1: 22, y2: 150, class: 'lv' })));
+      if (levels.length <= 4) levels.forEach((l) => kids.push(word(X(l), 16, l.toFixed(2), 'middle', 'lbl lvt')));
+      svg.replaceChildren(...kids);
+      const e0 = errs[0], e1 = errs[errs.length - 1], pc = (v) => (v * 100).toFixed(1) + '%';
+      note.textContent = st.step === 0
+        ? `${levels.length} levels, evenly spaced. Average squared error: ${pc(e0)} of the values' variance. Press "next step".`
+        : `Step ${st.step}: error ${pc(e1)}, down from ${pc(e0)} with evenly spaced levels (${((1 - e1 / e0) * 100).toFixed(0)}% less). The levels have crowded toward the middle, where most values are.`;
+    };
+    $(fig, '[data-k=bits]').addEventListener('input', (e) => { st.bits = +e.target.value; $(fig, '[data-o=bits]').textContent = st.bits; init(); draw(); });
+    $(fig, '[data-act=next]').addEventListener('click', () => { step(); draw(); });
+    $(fig, '[data-act=reset]').addEventListener('click', () => { init(); draw(); });
+    $(fig, '[data-act=run]').addEventListener('click', () => { clearInterval(timer); timer = setInterval(() => { const moved = step(); draw(); if (moved < 1e-3 || st.step >= 60) clearInterval(timer); }, 350); });
+    $(fig, '[data-o=bits]').textContent = st.bits; init(); draw();
+  };
+
+  // 11. What a model costs to store: bits per weight and group size against the iPod's RAM
+  const sizeCalcFig = (fig) => {
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-readout'), M = 134.5e6, G = [16, 32, 64, 128, 256], RAM = 256;
+    const draw = () => {
+      const bits = +$(fig, '[data-k=bits]').value, g = G[+$(fig, '[data-k=g]').value], bpw = bits + 32 / g, mb = M * bpw / 8 / 1e6, f32 = M * 4 / 1e6;
+      $(fig, '[data-o=bits]').textContent = bits; $(fig, '[data-o=g]').textContent = g;
+      const X = (v) => 190 + v / 600 * 430, kids = [], word = (x, y, t, a, c) => { const e = sv('text', { x, y, 'text-anchor': a, class: c || 'lbl' }); t && (e.textContent = t); return e; };
+      [['32-bit floats', f32, 'var(--muted)', 30], ['this setting', mb, 'var(--sx-blue)', 80]].forEach(([name, v, color, y]) => {
+        kids.push(word(180, y + 15, name, 'end', 'lbl rowname'), sv('rect', { x: 190, y, width: Math.max(2, X(v) - 190), height: 24, rx: 3 }, `fill:${color}`), word(X(v) + 8, y + 16, Math.round(v) + ' MB', 'start', 'lbl val'));
+      });
+      kids.push(sv('line', { x1: X(RAM), x2: X(RAM), y1: 14, y2: 118, class: 'ramline' }), word(X(RAM), 10, "iPod's RAM: 256 MB", 'middle', 'lbl meant'));
+      svg.replaceChildren(...kids);
+      note.textContent = `${bits} + 32/${g} = ${bpw.toFixed(2)} bits per weight, so ${Math.round(mb)} MB: ${(mb / f32 * 100).toFixed(0)}% of the floats, and ${mb > RAM ? 'more than the iPod has' : (mb / RAM * 100).toFixed(0) + '% of the iPod\'s RAM'}. The scales add ${(32 / g).toFixed(2)} bits per weight.`;
+    };
+    fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
+  };
+
+  // 12. Why the kernel rotates the activations: the identity with real numbers, and the operation count
+  const reuseFig = (fig) => {
+    const N = 8, box = $(fig, '.sx-reuse'), svg = $(fig, 'svg'), note = $(fig, '.sx-readout'); let seed = 5, w = [], x = [];
+    const fw = (v) => { const y = v.slice(); for (let h = 1; h < N; h *= 2) for (let i = 0; i < N; i += 2 * h) for (let j = i; j < i + h; j++) { const a = y[j], b = y[j + h]; y[j] = a + b; y[j + h] = a - b; } return y.map((q) => q / Math.sqrt(N)); };
+    const dot = (a, b) => a.reduce((t, q, i) => t + q * b[i], 0), sgn = (q, d) => (q < 0 ? '−' : '') + Math.abs(q).toFixed(d);
+    const gen = () => { const r = rng2(seed), g = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r()); w = Array.from({ length: N }, g); w[Math.floor(r() * N)] += 3; x = Array.from({ length: N }, g); };
+    const row = (label, v) => { const tr = el('tr'); tr.append(el('th', null, label)); v.forEach((a) => { const td = el('td', 'num', sgn(a, 2)); td.style.background = `color-mix(in srgb, ${a >= 0 ? 'var(--sx-red)' : 'var(--sx-blue)'} ${Math.min(100, Math.abs(a) / 3 * 100)}%, transparent)`; tr.append(td); }); return tr; };
+    const result = (text) => { const tr = el('tr', 'res'), td = el('td', null, text); td.colSpan = N + 1; tr.append(td); return tr; };
+    const draw = () => {
+      const hw = fw(w), hx = fw(x), t = el('table');
+      t.append(row('weights w', w), row('activations x', x), result(`w · x = ${sgn(dot(w, x), 4)}`), row('rotated weights Hw', hw), row('rotated activations Hx', hx), result(`(Hw) · (Hx) = ${sgn(dot(hw, hx), 4)}   the same answer`));
+      box.replaceChildren(t);
+      const R = 2 ** +$(fig, '[data-k=rows]').value, rot = 64 * 6, mac = 64, A = R * (rot + mac), B = rot + R * mac, fmt = (q) => q.toLocaleString('en-US');
+      $(fig, '[data-o=rows]').textContent = fmt(R);
+      const X = (q) => 200 + q / A * 340, kids = [], word = (px, py, tt, a, c) => { const e = sv('text', { x: px, y: py, 'text-anchor': a, class: c || 'lbl' }); e.textContent = tt; return e; };
+      [['rotate every row\'s weights back', A, 'var(--sx-red)', 18], ['rotate the activations once', B, 'var(--sx-blue)', 66]].forEach(([name, q, color, y]) => kids.push(word(190, y + 17, name, 'end', 'lbl rowname'), sv('rect', { x: 200, y, width: Math.max(2, X(q) - 200), height: 26, rx: 3 }, `fill:${color}`), word(X(q) + 8, y + 17, fmt(q), 'start', 'lbl val')));
+      svg.replaceChildren(...kids);
+      note.textContent = `With ${fmt(R)} row${R > 1 ? 's' : ''}, rotating every row's weights back takes ${fmt(A)} operations, and rotating the activations once takes ${fmt(B)}: ${(A / B).toFixed(1)} times fewer. Each group of 64 needs 6 × 64 = ${rot} additions to rotate, and each row's dot product needs ${mac} multiply-adds.`;
+    };
+    $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; gen(); draw(); });
+    $(fig, '[data-k=rows]').addEventListener('input', draw);
+    gen(); draw();
+  };
+
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // A contents column that floats on the left of wide windows: every numbered section, the 4-bit section's steps, and a highlight on the one being read
   (() => {

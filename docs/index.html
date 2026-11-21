@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=57" />
+    <link rel="stylesheet" href="assets/explainer.css?v=58" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -183,7 +183,13 @@
 
 <p><code>localsirid</code> is a daemon with both models loaded via <a href="https://en.wikipedia.org/wiki/Mmap"><code>mmap</code></a>:</p>
 <ul>
-<li><strong><a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a></strong> turns audio into text. It's an encoder–decoder <a href="https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)">transformer</a> with a few unusual parts: MLPs whose weights are <a href="https://en.wikipedia.org/wiki/Kronecker_product">Kronecker</a> products, four-lane <a href="https://arxiv.org/abs/2409.19606">hyper-connections</a> between layers (mixed by a 4×4 <a href="https://en.wikipedia.org/wiki/Sinkhorn%27s_theorem">Sinkhorn</a>-normalised matrix), and hashed <a href="https://en.wikipedia.org/wiki/N-gram">n-gram</a> memories in the decoder. <a href="https://github.com/cactus-compute/cactus">Cactus</a> ships it as one 16.9 MB file. The C port reads that file as it is, and its transcripts match a NumPy reference, which in turn matches Cactus's own engine.</li>
+<li><strong><a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a></strong> turns audio into text. It's an encoder–decoder <a href="https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)">transformer</a> with a few unusual parts:
+<ul>
+<li>MLPs whose weights are <a href="https://en.wikipedia.org/wiki/Kronecker_product">Kronecker</a> products.</li>
+<li>Four-lane <a href="https://arxiv.org/abs/2409.19606">hyper-connections</a> between layers, mixed by a 4×4 <a href="https://en.wikipedia.org/wiki/Sinkhorn%27s_theorem">Sinkhorn</a>-normalised matrix.</li>
+<li>Hashed <a href="https://en.wikipedia.org/wiki/N-gram">n-gram</a> memories in the decoder.</li>
+</ul>
+<a href="https://github.com/cactus-compute/cactus">Cactus</a> ships it as one 16.9 MB file. The C port reads that file as it is, and its transcripts match a NumPy reference, which in turn matches Cactus's own engine.</li>
 <li><strong><a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a></strong> (<a href="https://arxiv.org/abs/2502.02737">paper</a>) writes the answer. It's stored in Whistle's weight format, 76 MB in all.</li>
 </ul>
 
@@ -273,10 +279,15 @@
 </table></div>
 </details>
 
-<p>To get a feel for what grouping buys, try it on a toy matrix of 12 rows and 64 columns. Slide the number of groups per row up from one (a single scale for the whole row) and watch the rounding error. Here the 16 levels are spread evenly up to the largest weight in each group, the plain scheme from the figure above:</p>
+<p>To get a feel for what grouping buys, try it on a toy matrix of 12 rows and 64 columns:</p>
+<ul>
+<li>Slide "Groups per row" up from one, which is a single scale for the whole row, and watch the rounding error fall.</li>
+<li>"Groups with outliers" and "Outlier size" decide how many groups contain an outlier and how big it is. Slide the first down to 0 to see how much of the effect the outliers cause.</li>
+<li>The 16 levels are spread evenly up to the largest weight in each group: the plain scheme from the figure above.</li>
+</ul>
 
 <figure class="widget wide" data-widget="grouping">
-  <figcaption><strong>Why weights are grouped.</strong> Each cell is one weight (blue negative, red positive). White lines separate the rows and the groups within each row, and each group gets its own scale: the number printed on its cells, which is its largest weight (the plain scheme; Whistle uses the group's length instead). Every row has its own groups and scales. Outliers have a gold outline, and a group that contains one is outlined in the scales heatmap. Slide "Groups with outliers" down to 0 to see how much of the effect they cause. An outlier's size is a multiple of a typical weight.</figcaption>
+  <figcaption><strong>Why weights are grouped.</strong> Each cell is one weight (blue negative, red positive). White lines separate the rows and the groups within each row, and every row has its own groups and scales. The number printed on each group is its scale, its largest weight (Whistle uses the group's length instead, as we will see). A gold outline marks an outlier, and a group that contains one is outlined in the scales heatmap.</figcaption>
   <div class="sx-controls">
     <label>Groups per row <input type="range" min="0" max="4" step="1" value="0" data-k="g"> <output data-o="g"></output></label>
     <label>Groups with outliers <input type="range" min="0" max="12" step="1" value="6" data-k="nout"> <output data-o="nout"></output></label>
@@ -308,14 +319,14 @@
 </figure>
 
 <ul>
-<li>What matters is how spiky the group is: \(\max_j |w_j| \,/\, \ell\), its largest weight compared with the group's overall size, which is its length \(\ell\).</li>
-<li>You can't remove a spike without changing the weights.</li>
-<li>But you can change the axes you write them against.</li>
+<li>What matters is how spiky a group is: \(\max_j |w_j| \,/\, \ell\), its largest weight compared with the group's length \(\ell\).</li>
+<li>We can't remove a spike without changing the weights.</li>
+<li>But we can change the axes we write the weights against. That is what a rotation does.</li>
 </ul>
 
 <h4 id="s2-points" data-toc="Groups as points">Groups of two weights, as points</h4>
 
-<p>To visualize axes, let's consider the smallest case: groups of just 2 weights. Below is a row of weights cut into groups of two, like the one in the previous figure and at the same cell size. The groups run from a short one, where one weight is much bigger than the other, to a long one, where the two weights are equal:</p>
+<p>To visualize axes, let's consider the smallest case: groups of just 2 weights. Below is a row of weights cut into groups of two, like one row of the toy matrix above and at the same cell size. The groups run from a short one, where one weight is much bigger than the other, to a long one, where the two weights are equal:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="strips">
   <figcaption><strong>Groups of two weights.</strong> Each group has a number and a color, so that you can follow it through the figures below.</figcaption>
@@ -349,7 +360,7 @@
 </ul>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant bits loss trail" data-toggles="squares:Squares;grid:Grid points;start:Real weights (start);trail:Trails;end:Stored positions (end);bits:Binary labels">
-  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Each of the 16 grid points is a possible stored value. Each solid marker sits where its group is stored, with a trail of shadows behind it back to the group's real weights, and the label next to it gives that stored value, the two level numbers in binary (2 bits per weight). The selected group's levels are numbered along its square. Click a marker to select a group and make its square and outline thicker.</figcaption>
+  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Each grid point is a possible stored value, and the label next to each solid marker gives its group's stored value: the two level numbers in binary, 2 bits per weight. A trail of shadows leads back to the group's real weights. The selected group's levels are numbered along its square. Click a marker to select a group.</figcaption>
   <div class="sx-controls"><button data-act="replay">replay the movement</button></div>
   <svg class="sx-r2" viewBox="0 -8 330 322" style="max-width:34rem" role="img" aria-label="Groups as points with the square of quantization levels and the grid, each drawn where it is stored, with a trail of fading shadows back to its real weights"></svg>
   <p class="sx-cap2">Here is how much each group loses to rounding, the length of its trail as a share of the group's length, split into the first half (closer to an axis) and the second half (closer to a diagonal):</p>
@@ -359,7 +370,12 @@
 
 <h4 id="s2-rotate" data-toc="Rotating the points">Rotating the points</h4>
 
-<p>Now rotate the groups. The two curves show, at every angle, the largest weight as a share of the group's length, averaged over the first half of the groups, which are spiky (gold), and over the second half, which are flat (blue). Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
+<p>Now rotate the groups and watch what happens to each half:</p>
+<ul>
+<li>The two curves show, at every angle, the largest weight as a share of the group's length, averaged over the spiky first half (gold) and the flat second half (blue). Lower is flatter, and the rounding error follows it.</li>
+<li>The loss diagram under the plot shows how much each group loses at the current angle.</li>
+<li>The camera switch changes the viewpoint. Off, the camera stays with the axes and the points move. On, it stays with the points, and the axes and squares turn the other way.</li>
+</ul>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant ghost curve loss" data-toggles="squares:Squares;grid:Grid points;pre:Pre-rotation locations;start:Rotated locations (start);end:Stored locations (end);trail:Arrows">
   <figcaption><strong>Rotating groups of two weights.</strong> Dashed outlines mark where the groups started, filled markers are where the rotation has taken them, and solid outlines are where each group is stored.</figcaption>
@@ -463,11 +479,12 @@
 
 <h4 id="s2-which" data-toc="Which rotation?">Which rotation?</h4>
 
-<p>Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, because it can be generated by a simple rule: the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. Our groups so far have had two weights, but Whistle's have 64 or 128, so we need such a matrix for bigger groups too. It is a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
+<p>Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, because a simple rule generates it: the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. Our groups so far have had two weights, but Whistle's have 64 or 128, so we need one for bigger groups too.</p>
+<p>It is a square matrix whose entries are all +1 or −1, divided by \(\sqrt{n}\) so that it keeps lengths. The 2×2 one is
 \[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
-Each bigger one is four copies of the previous one, with the bottom-right copy negated. That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up to 64 and 128:
+and each bigger one is four copies of the previous one, with the bottom-right copy negated:
 \[ H_{2n} = \frac{1}{\sqrt{2}}\begin{bmatrix} H_n & H_n \\ H_n & -H_n \end{bmatrix} \]
-Here are the entries of these matrices, before the scaling:</p>
+That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up to 64 and 128. Here are the entries, before the scaling:</p>
 
 <figure class="widget wide" data-widget="hadamard">
   <figcaption><strong>Building a Walsh–Hadamard matrix by doubling.</strong> Blue is +1, red is −1. Pick a size, then click a row to see what it computes.</figcaption>
@@ -478,11 +495,15 @@ Here are the entries of these matrices, before the scaling:</p>
 
 <p>Two properties make this the right tool:</p>
 <ul>
-<li><strong>Every output mixes every input.</strong> Each output is a ± sum of all the group's weights. One large weight therefore spreads evenly over all 64 outputs instead of dominating one. Sums of many ± terms tend toward a bell curve (the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a>), so the rotated group looks much more <a href="https://en.wikipedia.org/wiki/Normal_distribution">Gaussian</a> than the original, with no lone extremes. <a href="https://arxiv.org/abs/2402.04396">QuIP#</a> and <a href="https://arxiv.org/abs/2404.00456">QuaRot</a> use the same idea for large models.</li>
+<li><strong>Every output mixes every input.</strong> Each output is a ± sum of all the group's weights, so one large weight spreads evenly over all 64 outputs instead of dominating one.
+<ul>
+<li>Sums of many ± terms tend toward a bell curve (the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a>), so the rotated group looks much more <a href="https://en.wikipedia.org/wiki/Normal_distribution">Gaussian</a> than the original, with no lone extremes.</li>
+<li><a href="https://arxiv.org/abs/2402.04396">QuIP#</a> and <a href="https://arxiv.org/abs/2404.00456">QuaRot</a> use the same idea for large models.</li>
+</ul></li>
 <li><strong>It is its own inverse.</strong> The rows are <a href="https://en.wikipedia.org/wiki/Orthogonal_matrix">orthogonal</a> and the matrix is symmetric, so applying it twice gives back the original. Rotating loses nothing.</li>
 </ul>
 
-<p>To see the first property at work, try it yourself. Orange is a group of weights as they come, with some outliers mixed in; blue is the same group after rotation. The histograms below the bars show where the values sit on the number line:</p>
+<p>To see the first property at work: orange is a group of weights as they come, with some outliers mixed in, and blue is the same group after rotation. The histograms below the bars show where the values sit:</p>
 
 <figure class="widget wide" data-widget="spread">
   <figcaption><strong>What rotation does to a group.</strong> Each bar is one weight. Make the group bigger and watch one tall spike turn into many short bars of random sign, then add outliers and watch the pile in the middle turn into a bell. Both rows share one scale, so the heights are directly comparable.</figcaption>
@@ -513,7 +534,7 @@ Here are the entries of these matrices, before the scaling:</p>
 <tr><td>128</td><td class="num">8.8%</td></tr>
 </tbody>
 </table></div>
-<p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the 2D picture shows when it helps. This is the same figure as before, with that angle marked:</p>
+<p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the two-weight picture shows when it helps. Here it is again, with that angle marked:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="had" data-groups="clusters" data-layers="points quant ghost curve" data-had="1">
   <figcaption><strong>The Hadamard angle.</strong> Two kinds of group, as before, but now arranged symmetrically: the spiky groups (triangles) are spread evenly on both sides of an axis, and the flat groups (circles) on both sides of a diagonal. That way the Hadamard matrix, marked on the curves and shown next to the rotation matrix, sits exactly at the bottom of the spiky curve. Rotate:</figcaption>
@@ -603,15 +624,32 @@ Here are the entries of these matrices, before the scaling:</p>
 </ul>
 </details>
 
+<p>So the rotation is settled: one Hadamard matrix, applied to every group. Next come the levels.</p>
+
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 <ul>
-<li>Rotated groups all have roughly the same bell shape (once divided by their length), so one set of levels can serve all of them.</li>
+<li>Divide each group by its length, which is stored as the group's scale. What is left is a direction, so every group is on the same footing.</li>
+<li>Rotated groups all have roughly the same bell shape, so one set of levels can serve all of them.</li>
 <li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
 <li>Each weight stores the 4-bit index of its nearest level.</li>
 <li>With 2 bits there are only 4 levels. Whistle mixes 2- and 4-bit layers.</li>
 </ul>
 
-<p>Here is that idea on the two-weight groups from step 2. The length of each group is divided out, so the dots sit on a circle of length 1, and one grid is shared by every group:</p>
+<p>To see how the levels are found, step through Lloyd's algorithm. The bars are a pile of rotated values, a bell curve, and the levels start out evenly spaced:</p>
+
+<figure class="widget wide" data-widget="lloyd">
+  <figcaption><strong>Finding the levels with Lloyd's algorithm.</strong> Gold ticks are the levels, and the dashed lines between them cut the number line into the zone each level serves. Each step sends every value to its nearest level, then moves each level to the average of the values it got.</figcaption>
+  <div class="sx-controls">
+    <label>Bits <input type="range" min="2" max="4" step="1" value="2" data-k="bits"> <output data-o="bits"></output></label>
+    <button data-act="next">next step</button>
+    <button data-act="run">run to the end</button>
+    <button data-act="reset">reset</button>
+  </div>
+  <svg class="sx-ll" viewBox="0 0 640 230" role="img" aria-label="A bell curve of values with quantization levels that move toward where the values are, one step at a time"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Now the same idea on the two-weight groups from step 2. The length of each group is divided out, so the dots sit on a circle of length 1, and one grid is shared by every group:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="step3" data-layers="strips points quant ghost curve" data-levels="fixed">
   <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Rotate the groups and watch the arrows: they shrink for the triangles (the spiky first half) as those get flatter, and grow for the circles (the flat second half):</figcaption>
@@ -661,6 +699,18 @@ Here are the entries of these matrices, before the scaling:</p>
 <li>Whistle is 16.9 MB.</li>
 </ul>
 
+<p>Other choices cost other amounts. Try a few and compare with the iPod's 256 MB of RAM:</p>
+
+<figure class="widget wide" data-widget="sizecalc">
+  <figcaption><strong>What a model costs to store.</strong> 134.5 million weights, each taking a number of bits, plus one 32-bit scale for every group.</figcaption>
+  <div class="sx-controls">
+    <label>Bits per weight <input type="range" min="1" max="8" step="1" value="4" data-k="bits"> <output data-o="bits"></output></label>
+    <label>Weights per group <input type="range" min="0" max="4" step="1" value="2" data-k="g"> <output data-o="g"></output></label>
+  </div>
+  <svg class="sx-sz" viewBox="0 0 640 150" role="img" aria-label="Bars comparing the size of the model as 32-bit floats, at the chosen bits and group size, and the iPod's RAM"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
 <p id="step-4" data-toc="Step 4: never rebuild the weights"><strong>Step 4: never rebuild the weights.</strong></p>
 <ul>
 <li>To use a weight you'd normally decode it: look up its level, multiply by the length, rotate back.</li>
@@ -677,6 +727,19 @@ Here are the entries of these matrices, before the scaling:</p>
 <li>On the iPod's <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a> unit, one table-lookup instruction (<code>vtbl</code>) turns 8 indices into 8 small integer levels.</li>
 <li>Multiply-accumulate instructions then sum 8 or 16 products at a time.</li>
 </ul>
+
+<p>Here is the shortcut with real numbers. Both routes give the same answer, but rotating the activations once is much cheaper when many rows share them:</p>
+
+<figure class="widget wide" data-widget="reuse">
+  <figcaption><strong>Rotate the activations, not the weights.</strong> The top shows one group of 8 weights and the 8 activations they meet. The bottom counts the operations for groups of 64 when a matrix has many rows.</figcaption>
+  <div class="sx-controls">
+    <button data-act="new">new numbers</button>
+    <label>Rows in the matrix <input type="range" min="0" max="12" step="1" value="8" data-k="rows"> <output data-o="rows"></output></label>
+  </div>
+  <div class="sx-reuse"></div>
+  <svg class="sx-cost" viewBox="0 0 640 120" role="img" aria-label="Bars comparing the operations needed when each row's weights are rotated back, and when the activations are rotated once"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
 
 <p>The rotation itself is cheap thanks to the <a href="https://en.wikipedia.org/wiki/Fast_Walsh%E2%80%93Hadamard_transform">fast Walsh–Hadamard transform</a>. Because the matrix is built by doubling, it can be applied in \(\log_2 n\) rounds of add-and-subtract on pairs, the same <a href="https://en.wikipedia.org/wiki/Butterfly_diagram">butterfly</a> pattern as the FFT, with no multiplications:</p>
 
@@ -706,7 +769,7 @@ Here are the entries of these matrices, before the scaling:</p>
 </tbody>
 </table></div>
 
-<p>About the models and the daemon:</p>
+<p>How Whistle compares with the model it replaced:</p>
 <ul>
 <li>The earlier pair, <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> (<a href="https://arxiv.org/abs/2410.15608">paper</a>, 30 MB) and the evenly spaced 4/8-bit SmolLM2 (98 MB), is still supported as a fallback.</li>
 <li>Whistle matched Moonshine's speed on the iPod with half the memory.</li>
@@ -779,6 +842,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=73" defer></script>
+    <script src="assets/explainer.js?v=76" defer></script>
   </body>
 </html>
