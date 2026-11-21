@@ -262,11 +262,12 @@
 
 /* Option cards: a few-word heading with its description inside the toggle */
 .siri-explainer figure.widget .sx-rowlabel.sx-block { display: block; margin: 1rem 0 .4rem; min-width: 0; }
-.sx-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .6rem; margin: 0 0 .8rem; }
-.siri-explainer figure.widget .sx-opts button { display: block; text-align: left; margin: 0; padding: .6rem .8rem; border: 1px solid var(--sx-rule); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .85rem; line-height: 1.4; }
+.sx-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1px; margin: 0 0 .8rem; background: color-mix(in srgb, var(--muted) 60%, transparent); border: 1px solid color-mix(in srgb, var(--muted) 60%, transparent); border-radius: 8px; overflow: hidden; }
+.siri-explainer figure.widget .sx-opts button { display: block; text-align: left; margin: 0; padding: .6rem .8rem; border: 0; border-radius: 0; background: var(--sx-panel); color: var(--text); font: inherit; font-size: .85rem; line-height: 1.4; }
 .siri-explainer figure.widget .sx-opts button::before, .siri-explainer figure.widget .sx-opts button::after { display: none; }
-.siri-explainer figure.widget .sx-opts button:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.siri-explainer figure.widget .sx-opts button:hover { background: color-mix(in srgb, var(--text) 6%, var(--sx-panel)); }
 .siri-explainer figure.widget .sx-opts button strong { display: block; margin-bottom: .15rem; font-size: .95rem; }
 .siri-explainer figure.widget .sx-opts button span { color: var(--muted); }
-.siri-explainer figure.widget .sx-opts button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 12%, var(--bg)); border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.siri-explainer figure.widget .sx-opts button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 14%, var(--sx-panel)); }
+.siri-explainer figure.widget .sx-opts button[aria-pressed=true] span { color: var(--text); }
 .siri-explainer figure.widget .sx-hint { color: var(--muted); font-size: .85rem; margin: .1rem 0 .6rem; }
