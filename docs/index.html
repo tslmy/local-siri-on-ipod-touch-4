@@ -208,6 +208,8 @@
 </tbody>
 </table></div>
 
+<p>The "bell curve" of stage 3 is the <a href="https://en.wikipedia.org/wiki/Normal_distribution">normal (Gaussian) distribution</a>: values pile up symmetrically around zero, most close to it and few far out.<span class="sidenote-wrap"><label for="sn-6" class="sidenote-number"></label><input type="checkbox" id="sn-6" class="sidenote-toggle"><span class="sidenote">A normal distribution is fixed by its centre, here 0, and its spread \(\sigma\). About 68% of the values lie within one \(\sigma\) of the centre and 99.7% within three, which is why a value beyond \(3\sigma\) is rare (0.27%) in the histograms below.</span></span></p>
+
 <p id="plain-quantization" data-toc="Plain quantization"><strong>First, plain quantization.</strong> A weight is a number such as 0.137, and a float stores it in 32 bits. Quantization stores a rougher copy instead:</p>
 <ul>
 <li><strong>Levels.</strong> Choose a small set of allowed values, called levels.</li>
@@ -739,7 +741,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p>For groups of 64:</p>
 <ul>
-<li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9, which is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
+<li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9, which is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. (A normal distribution would score 3. A group of fixed length cannot hold extreme values, so it comes out a little below.) The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
 <li><strong>It helps most where the weights are least bell-shaped.</strong> The embedding goes from a kurtosis of 5.2 to 2.9. The same holds for groups with an outlier, as in the toy examples earlier. So the rotation is less a source of the bell shape than a guarantee of it.</li>
 <li><strong>Without dividing by the length, the picture is much worse.</strong> Groups differ a lot in size, so the values are a mixture of many bell curves of different widths, which has heavy tails (kurtosis 5.4, largest value 51σ). Rotating helps (3.7, 25σ) but cannot make the groups alike: it mixes the weights inside a group and leaves the group's size alone. That is why the length is divided out first, and stored as the scale.</li>
 <li><strong>Small groups show little.</strong> In a group of 8 no value can exceed \(\sqrt{8} = 2.8\sigma\), so there are no tails to trim. Slide the group size up to see the effect grow.</li>
@@ -987,6 +989,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=111" defer></script>
+    <script src="assets/explainer.js?v=112" defer></script>
   </body>
 </html>
