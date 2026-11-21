@@ -628,7 +628,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 
-<p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat the savings.</p>
+<p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat most of the savings (the numbers are in "Taking stock" below).</p>
 
 <p>Start with the shape of the values. Trained weights are usually roughly bell-shaped, as one would expect: they start out as random Gaussian numbers, and training adds up many small nudges. Here are the real weights of SmolLM2. Each group is first divided by its length, so that every group is measured on the same scale:</p>
 
@@ -791,6 +791,22 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <li>Whistle is 16.9 MB.</li>
 </ul>
 
+<p>The shared parts are almost free, and the alternatives are not. Per weight, for groups of 64 and 32-bit numbers:</p>
+<div class="wide"><table>
+<thead><tr><th>What is stored</th><th class="num">Bits per weight</th><th class="num">SmolLM2</th></tr></thead>
+<tbody>
+<tr><td>32-bit floats, for reference</td><td class="num">32</td><td class="num">538 MB</td></tr>
+<tr><td><strong>What we do:</strong> 4-bit indices, one scale per group, one Hadamard matrix and one codebook for everything</td><td class="num">4.5</td><td class="num">76 MB</td></tr>
+<tr><td>A fresh 16-level codebook for every group instead of the shared one (it replaces the scale: 16 numbers instead of 1)</td><td class="num">12</td><td class="num">202 MB</td></tr>
+<tr><td>A different dense random rotation for every group, instead of the Hadamard matrix (\(64\times 64\) numbers each)</td><td class="num">about 2,050</td><td class="num">about 34 GB</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>The shared codebook costs 64 bytes</strong> (16 numbers) for the whole model, and the Hadamard matrix costs nothing, because the doubling rule generates it.</li>
+<li><strong>A fresh codebook per group</strong> would fit each group better, but its 16 numbers are twice the size of the group's 64 four-bit indices, so the model would be 2.7 times bigger and would leave little of the 256 MB for anything else.</li>
+<li><strong>A different dense rotation per group</strong> would cost 512 times more than the weights it rotates, and could not be applied cheaply either.</li>
+</ul>
+
 <p>Other choices cost other amounts. Try a few and compare with the iPod's 256 MB of RAM:</p>
 
 <figure class="widget wide" data-widget="sizecalc">
@@ -896,6 +912,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=92" defer></script>
+    <script src="assets/explainer.js?v=93" defer></script>
   </body>
 </html>
