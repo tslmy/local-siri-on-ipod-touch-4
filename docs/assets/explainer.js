@@ -1022,13 +1022,13 @@
     const D = window.WEIGHT_HIST, svg = $(fig, 'svg'), note = $(fig, '.sx-note');
     if (!D) { note.textContent = 'The weight statistics did not load.'; return; }
     const SIZES = [8, 16, 32, 64], LABEL = { all: 'all layers', attention: 'attention layers', mlp: 'feed-forward layers', embedding: 'embedding' };
-    const st = { cls: 'all', g: 3, log: false };
+    const st = { cls: 'all', g: 3, log: false, norm: true };
     const txt = (x, y, str, anchor, cls) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
     const draw = () => {
-      const G = SIZES[st.g], d = D.data[`${st.cls}/${G}`], NB = D.bins.n, bw = D.bins.width, xm = -D.bins.lo, n = d.n;
+      const G = SIZES[st.g], e = D.data[`${st.cls}/${G}`], d = st.norm ? e : { ...e, before: e.rawbefore, after: e.rawafter, kurt: e.rawkurt, beyond3: e.rawbeyond3, max: e.rawmax }, NB = D.bins.n, bw = D.bins.width, xm = -D.bins.lo, n = d.n;
       $(fig, '[data-o=g]').textContent = G;
       fig.querySelectorAll('[data-cls]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cls === st.cls)));
-      $(fig, '[data-k=log]').setAttribute('aria-pressed', String(st.log));
+      $(fig, '[data-k=log]').setAttribute('aria-pressed', String(st.log)); $(fig, '[data-k=norm]').setAttribute('aria-pressed', String(st.norm));
       const dens = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
       const top = Math.max(...d.before, ...d.after, n * bw * dens(0)) * 1.08;
       const T = (k) => (st.log ? Math.log10(1 + k) / Math.log10(1 + top) : k / top);
@@ -1044,11 +1044,12 @@
       });
       svg.replaceChildren(...kids);
       const f = (v) => v.toFixed(v < 10 ? 1 : 0);
-      note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G} (${(n / 1e6).toFixed(0)} million weights). Kurtosis (3 for a bell curve): ${d.kurt[0].toFixed(2)} before, ${d.kurt[1].toFixed(2)} after. Beyond 3σ (a bell curve has 0.27%): ${d.beyond3[0]}% before, ${d.beyond3[1]}% after. Largest value: ${f(d.max[0])}σ before, ${f(d.max[1])}σ after. A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.`;
+      note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G} (${(n / 1e6).toFixed(0)} million weights). Kurtosis (3 for a bell curve): ${d.kurt[0].toFixed(2)} before, ${d.kurt[1].toFixed(2)} after. Beyond 3σ (a bell curve has 0.27%): ${d.beyond3[0]}% before, ${d.beyond3[1]}% after. Largest value: ${f(d.max[0])}σ before, ${f(d.max[1])}σ after. ` + (st.norm ? `A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.` : 'Here only each whole matrix is scaled, so groups keep their own sizes, and values beyond ±6σ are counted in the end bars.');
     };
     fig.querySelectorAll('[data-cls]').forEach((b) => b.addEventListener('click', () => { st.cls = b.dataset.cls; draw(); }));
     $(fig, '[data-k=g]').addEventListener('input', (e) => { st.g = +e.target.value; draw(); });
     $(fig, '[data-k=log]').addEventListener('click', () => { st.log = !st.log; draw(); });
+    $(fig, '[data-k=norm]').addEventListener('click', () => { st.norm = !st.norm; draw(); });
     draw();
   };
 
@@ -1097,12 +1098,17 @@
       const bits = +$(fig, '[data-k=bits]').value, g = G[+$(fig, '[data-k=g]').value], bpw = bits + 32 / g, mb = M * bpw / 8 / 1e6, f32 = M * 4 / 1e6;
       $(fig, '[data-o=bits]').textContent = bits; $(fig, '[data-o=g]').textContent = g;
       const X = (v) => 190 + v / 600 * 430, kids = [], word = (x, y, t, a, c) => { const e = sv('text', { x, y, 'text-anchor': a, class: c || 'lbl' }); t && (e.textContent = t); return e; };
-      [['32-bit floats', f32, 'var(--muted)', 30], ['this setting', mb, 'var(--sx-blue)', 80]].forEach(([name, v, color, y]) => {
-        kids.push(word(180, y + 15, name, 'end', 'lbl rowname'), sv('rect', { x: 190, y, width: Math.max(2, X(v) - 190), height: 24, rx: 3 }, `fill:${color}`), word(X(v) + 8, y + 16, Math.round(v) + ' MB', 'start', 'lbl val'));
+      const wMB = M * bits / 8 / 1e6, sMB = M * 32 / g / 8 / 1e6, GOLD = 'var(--sx-gold)', BLUE = 'var(--sx-blue)';
+      [['32-bit floats', [[f32, 'var(--muted)']], 30], ['this setting', [[wMB, BLUE], [sMB, GOLD]], 80]].forEach(([name, parts, y]) => {
+        let acc = 0; const total = parts.reduce((t, p) => t + p[0], 0);
+        kids.push(word(180, y + 15, name, 'end', 'lbl rowname'));
+        parts.forEach(([v, color]) => { const x0 = X(acc), x1 = X(acc + v); kids.push(sv('rect', { x: x0, y, width: Math.max(2, x1 - x0), height: 24 }, `fill:${color}`)); acc += v; });
+        kids.push(word(X(total) + 8, y + 16, Math.round(total) + ' MB', 'start', 'lbl val'));
       });
+      [[BLUE, `weights: ${bits} bits each, ${Math.round(wMB)} MB`, 190], [GOLD, `group scales: 32 bits each, ${Math.round(sMB)} MB`, 400]].forEach(([color, label, x]) => kids.push(sv('rect', { x, y: 128, width: 10, height: 10 }, `fill:${color}`), word(x + 15, 137, label, 'start')));
       kids.push(sv('line', { x1: X(RAM), x2: X(RAM), y1: 14, y2: 118, class: 'ramline' }), word(X(RAM), 10, "iPod's RAM: 256 MB", 'middle', 'lbl meant'));
       svg.replaceChildren(...kids);
-      note.textContent = `${bits} + 32/${g} = ${bpw.toFixed(2)} bits per weight, so ${Math.round(mb)} MB: ${(mb / f32 * 100).toFixed(0)}% of the floats, and ${mb > RAM ? 'more than the iPod has' : (mb / RAM * 100).toFixed(0) + '% of the iPod\'s RAM'}. The scales add ${(32 / g).toFixed(2)} bits per weight.`;
+      note.textContent = `${bits} + 32/${g} = ${bpw.toFixed(2)} bits per weight, so ${Math.round(mb)} MB: ${(mb / f32 * 100).toFixed(0)}% of the floats, and ${mb > RAM ? 'more than the iPod has' : (mb / RAM * 100).toFixed(0) + '% of the iPod\'s RAM'}. Of that, the weights take ${Math.round(wMB)} MB and the group scales ${Math.round(sMB)} MB (${(32 / g).toFixed(2)} bits per weight).`;
     };
     fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
   };
