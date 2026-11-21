@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=48" />
+    <link rel="stylesheet" href="assets/explainer.css?v=49" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -316,16 +316,11 @@
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="strips">
   <figcaption><strong>Groups of two weights.</strong> Each group has a number and a color, so that you can follow it through the figures below.</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
-  <div class="sx-opts">
-    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one.</span></button>
-    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size.</span></button>
-  </div>
   <div class="sx-controls">
-    <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
-    <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
     <button data-act="new">new points</button>
   </div>
-  <p class="sx-hint">How tightly the groups hug "one big weight" or "two similar weights": at 100% every group is within 10° of it, and at 0% the directions are spread evenly.</p>
+  <p class="sx-hint">Half of the groups have an outlier (triangles): a big weight and a small one. The other half do not (circles): two weights of about the same size. The number of groups goes up in twos, one of each kind.</p>
   <div class="sx-trip">
     <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups as a row of cells, with each group's scale printed on it"></svg><p class="sx-hint">Weights, with each group's scale printed on it</p></div>
     <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the scale of each group"></svg><p class="sx-hint">Scale of each group, its largest weight (the more gold, the larger)</p></div>
@@ -336,7 +331,7 @@
 <p>Each group is just two numbers, <em>w</em><sub>1</sub> and <em>w</em><sub>2</sub>, so it can also be read as a point on a plane: the first weight is its horizontal coordinate and the second weight is its vertical one. Here are the same groups drawn that way, with the same numbers and colors:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points">
-  <figcaption><strong>Groups as points.</strong> Each dot is one group, placed at (<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>). Change the mock groups above and the dots move.</figcaption>
+  <figcaption><strong>Groups as points.</strong> Each marker is one group, placed at (<em>w</em><sub>1</sub>, <em>w</em><sub>2</sub>): triangles have an outlier, circles do not. Change the mock groups above and the markers move.</figcaption>
   <svg class="sx-r2" viewBox="0 0 330 300" style="max-width:34rem" role="img" aria-label="Each group of two weights drawn as a point, with the first weight on the horizontal axis and the second on the vertical axis"></svg>
 </figure>
 
@@ -348,15 +343,18 @@
 <li>A point on the diagonal has two equal weights, which is as flat as it gets: the square is smaller and the grid finer.</li>
 </ul>
 
-<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant bits">
-  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Each of the 16 grid points is a possible stored value. A hollow ring marks where a group is stored, and the label next to it gives that stored value, the two level numbers in binary (2 bits per weight). The selected group's levels are numbered along its square. Click a dot to select a group and make its square and arrow thicker.</figcaption>
+<figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant bits loss">
+  <figcaption><strong>Quantizing groups of two weights.</strong> Each group has its own scale, as in step 1, so each gets its own square in its own color, drawn to just reach its largest weight. Each of the 16 grid points is a possible stored value. A hollow outline marks where a group is stored, and the label next to it gives that stored value, the two level numbers in binary (2 bits per weight). The selected group's levels are numbered along its square. Click a dot to select a group and make its square and arrow thicker.</figcaption>
   <svg class="sx-r2" viewBox="0 -8 330 322" style="max-width:34rem" role="img" aria-label="Groups as points with the square of quantization levels, the grid, and an arrow from each point to the grid point it is stored as"></svg>
+  <p class="sx-cap2">Here is how much each group loses to rounding, the length of its arrow as a share of the group's length, split into groups with an outlier and the rest, as in the earlier figure of this step:</p>
+  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group, split into groups that contain an outlier and groups that do not"></svg>
+  <p class="sx-note" data-v="lossnote" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>Now rotate the groups. The curve shows, at every angle, the largest weight as a share of the group's length, averaged over the groups. Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
+<p>Now rotate the groups. The two curves show, at every angle, the largest weight as a share of the group's length, averaged over the groups with an outlier (gold) and over the groups without (blue). Lower is flatter, and the rounding error follows it. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="main" data-layers="points quant ghost curve">
-  <figcaption><strong>Rotating groups of two weights.</strong> Dashed rings mark where the groups started, filled dots are where the rotation has taken them, and solid rings are where each group is stored.</figcaption>
+  <figcaption><strong>Rotating groups of two weights.</strong> Dashed outlines mark where the groups started, filled markers are where the rotation has taken them, and solid outlines are where each group is stored.</figcaption>
   <div class="sx-rowlabel sx-block">Rotation</div>
   <div class="sx-controls">
     <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
@@ -504,15 +502,10 @@ Here are the entries of these matrices, before the scaling:</p>
 <p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the 2D picture shows when it helps. This is the same figure as before, with that angle marked:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="had" data-layers="points quant ghost curve" data-had="1">
-  <figcaption><strong>The Hadamard angle.</strong> The same two-weight groups as before, now with the Hadamard matrix marked on the curve and shown next to the rotation matrix. Make up some groups, then rotate:</figcaption>
+  <figcaption><strong>The Hadamard angle.</strong> The same two kinds of group as before, now with the Hadamard matrix marked on the curves and shown next to the rotation matrix. Rotate:</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
-  <div class="sx-opts">
-    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one, so a group starts near an axis.</span></button>
-    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size, so a group starts near a diagonal.</span></button>
-  </div>
   <div class="sx-controls">
-    <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
-    <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
     <button data-act="new">new points</button>
   </div>
   <div class="sx-rowlabel sx-block">Rotation</div>
@@ -527,11 +520,10 @@ Here are the entries of these matrices, before the scaling:</p>
   <div class="sx-mat"></div>
   <p class="sx-note">In two dimensions the match is exact: the Hadamard matrix is the 45° rotation with its two outputs swapped. Swapping outputs does not change the rounding error, because the grid is the same either way.</p>
   <div class="callout">
-    <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and it is worth being clear which:
+    <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and the two curves show which:
     <ul>
-    <li><strong>Groups with one big weight (an outlier), which start near an axis.</strong> They are as far from 45° as possible, so turning by 45° brings them to the flat direction. That is the first mock-group setting at 100%.</li>
-    <li><strong>Not groups that start near a diagonal.</strong> Switch to "Two similar weights each" and the curve flips: they are already flat, and 45° turns them into spikes.</li>
-    <li><strong>Not groups spread evenly in every direction.</strong> The curve is nearly flat and no angle helps on average.</li>
+    <li><strong>Groups with one big weight (an outlier), the triangles.</strong> They start near an axis, as far from 45° as possible, so turning by 45° brings them to the flat direction. The gold curve is lowest at 45°.</li>
+    <li><strong>Groups without an outlier, the circles.</strong> They start near a diagonal, so they are already flat, and 45° turns them into spikes. The blue curve peaks at 45°.</li>
     </ul>
     With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
   </div>
@@ -561,15 +553,10 @@ Here are the entries of these matrices, before the scaling:</p>
 <p>Here is that idea on the two-weight groups from step 2. The length of each group is divided out, so the dots sit on a circle of length 1, and one grid is shared by every group:</p>
 
 <figure class="widget wide" data-widget="rot2d" data-scene="step3" data-layers="strips points quant ghost curve" data-levels="fixed">
-  <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Make up some groups, then rotate them and watch the arrows shrink as the groups get flatter:</figcaption>
+  <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Rotate the groups and watch the arrows: they shrink for the triangles (groups with an outlier) as those get flatter, and grow for the circles:</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
-  <div class="sx-opts">
-    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one.</span></button>
-    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size.</span></button>
-  </div>
   <div class="sx-controls">
-    <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
-    <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
     <button data-act="new">new points</button>
   </div>
   <div class="sx-trip">
@@ -732,6 +719,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=53" defer></script>
+    <script src="assets/explainer.js?v=54" defer></script>
   </body>
 </html>

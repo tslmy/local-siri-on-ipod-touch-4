@@ -300,3 +300,6 @@
 .sx-r2 .bitl, .sx-r2 .bitk { font: bold 10px var(--sx-mono); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
 .sx-r2 .dest { fill: none; pointer-events: none; }
 .sx-r2 .ghost { stroke-dasharray: 2.5 2.5; }
+.sx-ol .lossdot { opacity: .95; }
+.sx-ol .gnum { font-weight: bold; font-size: 10px; pointer-events: none; }
+.sx-r2 .crv { stroke-width: 2; }
