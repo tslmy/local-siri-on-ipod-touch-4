@@ -29,7 +29,7 @@
 
 <p><a href="https://en.wikipedia.org/wiki/Siri">Siri</a> arrived in October 2011 with the <a href="https://en.wikipedia.org/wiki/IPhone_4S">iPhone 4S</a> and iOS 5. The <a href="https://en.wikipedia.org/wiki/IPod_Touch_(4th_generation)">iPod touch 4th generation</a>, sold until 2013 and updated to <a href="https://en.wikipedia.org/wiki/IOS_6">iOS 6</a>.1.6, never got it. Apple's line was that Siri needed the 4S's hardware. In truth, Siri's <a href="https://en.wikipedia.org/wiki/Speech_recognition">speech recognition</a> and answers ran on Apple's servers, which went dark years ago, so even a real 4S no longer has a working Siri.</p>
 
-<p>This project gives the iPod the real thing, Apple's own interface, and answers it with a small "server" that runs <em>on the iPod</em>. Speech recognition is Cactus Compute's <a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a> and the answers come from <a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a>, both rewritten in plain C. Nothing leaves the device.<span class="sidenote-wrap"><label for="sn-1" class="sidenote-number"></label><input type="checkbox" id="sn-1" class="sidenote-toggle"><span class="sidenote">The repository holds only original code. Apple's files come from firmware you download from Apple yourself, and stay on your machine. See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4#legal">README</a>.</span></span></p>
+<p>This project gives the iPod the real thing, Apple's own interface, and answers it with a small "server" that runs <em>on the iPod</em>. Speech recognition is <a href="https://github.com/cactus-compute">Cactus Compute</a>'s <a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a> and the answers come from <a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a>, both rewritten in plain C. Nothing leaves the device.<span class="sidenote-wrap"><label for="sn-1" class="sidenote-number"></label><input type="checkbox" id="sn-1" class="sidenote-toggle"><span class="sidenote">The repository holds only original code. Apple's files come from firmware you download from Apple yourself, and stay on your machine. See the <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4#legal">README</a>.</span></span></p>
 
 <nav class="toc" aria-label="Contents">
 <h2 id="contents">Contents</h2>
@@ -54,7 +54,7 @@
 <thead><tr><th>Part</th><th>What it means here</th></tr></thead>
 <tbody>
 <tr><td><a href="https://en.wikipedia.org/wiki/Apple_A4">Apple A4</a>: one <a href="https://en.wikipedia.org/wiki/ARM_Cortex-A8">Cortex-A8</a> core at ~1 GHz with NEON</td><td>One thread of work. <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a>, its <a href="https://en.wikipedia.org/wiki/SIMD">SIMD</a> unit, does 4 to 16 small multiplies per instruction, which is what makes the models usable at all.</td></tr>
-<tr><td>256 MB of RAM</td><td>About 46 MB is wired by the kernel and drivers. SpringBoard, the daemons and Siri take another ~60 MB, leaving roughly 100 to 130 MB for the models.</td></tr>
+<tr><td>256 MB of RAM</td><td>About 46 MB is wired by the kernel and drivers. <a href="https://iphonedev.wiki/SpringBoard">SpringBoard</a>, the daemons and Siri take another ~60 MB, leaving roughly 100 to 130 MB for the models.</td></tr>
 <tr><td><a href="https://en.wikipedia.org/wiki/Memory_bandwidth">Memory bandwidth</a>: 370 MB/s (measured)</td><td>Producing one word of the answer means reading every weight once: 66 MB, so at most ~5 words per second.</td></tr>
 <tr><td>Flash: 80 MB/s read sequentially, ~6 MB/s via <a href="https://en.wikipedia.org/wiki/Page_fault">page faults</a> (measured)</td><td>How a model is brought back into RAM matters more than almost anything else (§9).</td></tr>
 <tr><td>iOS 6.1.6, <a href="https://en.wikipedia.org/wiki/IOS_jailbreaking">jailbroken</a></td><td>Root access, SSH, and <a href="https://iphonedev.wiki/Cydia_Substrate">Cydia Substrate</a> to patch running code.</td></tr>
@@ -88,7 +88,7 @@
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>So the shopping list is short: about 45 MB of ordinary files from the 4S's iOS 6.1.3 root filesystem, plus one binary, <code>AssistantUI</code>, that exists only inside the 4S's shared cache. The firmware is still on Apple's servers. Only the root filesystem image (925 MB) is fetched, from inside the IPSW zip, and it is decrypted with its <a href="https://theapplewiki.com/wiki/Keys:BrightonMaps_10B329_(iPhone4,1)">published key</a>.</p>
+<p>So the shopping list is short: about 45 MB of ordinary files from the 4S's iOS 6.1.3 root filesystem, plus one binary, <code>AssistantUI</code>, that exists only inside the 4S's shared cache. The firmware is still on Apple's servers. Only the root filesystem image (925 MB) is fetched, from inside the <a href="https://theapplewiki.com/wiki/IPSW_File_Format">IPSW</a> zip, and it is decrypted with its <a href="https://theapplewiki.com/wiki/Keys:BrightonMaps_10B329_(iPhone4,1)">published key</a>.</p>
 </section>
 
 <section>
@@ -185,22 +185,22 @@
 <ul>
 <li><strong><a href="https://huggingface.co/Cactus-Compute/whistle">Whistle</a></strong> turns audio into text. It's an encoder–decoder <a href="https://en.wikipedia.org/wiki/Transformer_(deep_learning_architecture)">transformer</a> with a few unusual parts:
 <ul>
-<li>MLPs whose weights are <a href="https://en.wikipedia.org/wiki/Kronecker_product">Kronecker</a> products.</li>
+<li><a href="https://en.wikipedia.org/wiki/Multilayer_perceptron">MLPs</a> whose weights are <a href="https://en.wikipedia.org/wiki/Kronecker_product">Kronecker</a> products.</li>
 <li>Four-lane <a href="https://arxiv.org/abs/2409.19606">hyper-connections</a> between layers, mixed by a 4×4 <a href="https://en.wikipedia.org/wiki/Sinkhorn%27s_theorem">Sinkhorn</a>-normalised matrix.</li>
 <li>Hashed <a href="https://en.wikipedia.org/wiki/N-gram">n-gram</a> memories in the decoder.</li>
 </ul>
-<a href="https://github.com/cactus-compute/cactus">Cactus</a> ships it as one 16.9 MB file. The C port reads that file as it is, and its transcripts match a NumPy reference, which in turn matches Cactus's own engine.</li>
+<a href="https://github.com/cactus-compute/cactus">Cactus</a> ships it as one 16.9 MB file. The C port reads that file as it is, and its transcripts match a <a href="https://numpy.org/">NumPy</a> reference, which in turn matches Cactus's own engine.</li>
 <li><strong><a href="https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct">SmolLM2-135M-Instruct</a></strong> (<a href="https://arxiv.org/abs/2502.02737">paper</a>) writes the answer. It's stored in Whistle's weight format, 76 MB in all.</li>
 </ul>
 
-<p id="quantization" data-toc="How a weight fits in 4 bits"><strong>How a weight fits in 4 bits.</strong> Both models are mostly big matrices of weights, and each answer word means reading all of them once (§1: memory bandwidth). In 32-bit floats SmolLM2 alone is 538 MB, twice the iPod's RAM, so every weight has to shrink to a few bits. Whistle ships with a scheme for that, codebook quantization, and I ported it to C and used it for SmolLM2 too. It has four steps:</p>
+<p id="quantization" data-toc="How a weight fits in 4 bits"><strong>How a weight fits in 4 bits.</strong> Both models are mostly big matrices of weights, and each answer word means reading all of them once (§1: memory bandwidth). In 32-bit floats SmolLM2 alone is 538 MB, twice the iPod's RAM, so every weight has to shrink to a few bits. Whistle ships with a scheme for that, <a href="https://en.wikipedia.org/wiki/Vector_quantization">codebook</a> quantization, and I ported it to C and used it for SmolLM2 too. It has four steps:</p>
 <ul>
 <li><strong>Groups.</strong> Each row is cut into groups of 64 weights (128 in Whistle), and each group gets its own scale, so one outlier spoils only its own group.</li>
-<li><strong>Rotation.</strong> A fixed Hadamard rotation spreads what an outlier leaves of itself across its group.</li>
-<li><strong>Codebook.</strong> Each group is divided by its length, and one shared set of 16 levels, made for a bell curve, serves every group.</li>
+<li><strong>Rotation.</strong> A fixed <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Hadamard</a> rotation spreads what an outlier leaves of itself across its group.</li>
+<li><strong>Codebook.</strong> Each group is divided by its length, and one shared set of 16 levels, made for a <a href="https://en.wikipedia.org/wiki/Normal_distribution">bell curve</a>, serves every group.</li>
 <li><strong>Kernel.</strong> The activations are rotated instead of the weights, so the weights are never rebuilt.</li>
 </ul>
-<p>A weight then costs 4.5 bits instead of 32, on average. SmolLM2 went from 538 MB to 76 MB and Whistle is 16.9 MB. For SmolLM2, <a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounding brought the perplexity on held-out chats from 9.6 down to 8.1–8.9, against 7.2 for the 32-bit floats. Each step is explained, with live figures, in a separate article: <a href="https://myli.page/posts/202611211800-how-a-weight-fits-in-4-bits/">How a weight fits in 4 bits</a>.</p>
+<p>A weight then costs 4.5 bits instead of 32, on average. SmolLM2 went from 538 MB to 76 MB and Whistle is 16.9 MB. For SmolLM2, <a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounding brought the <a href="https://en.wikipedia.org/wiki/Perplexity">perplexity</a> on held-out chats from 9.6 down to 8.1–8.9, against 7.2 for the 32-bit floats. Each step is explained, with live figures, in a separate article: <a href="https://myli.page/posts/202611211800-how-a-weight-fits-in-4-bits/">How a weight fits in 4 bits</a>.</p>
 
 <p id="vs-moonshine" data-toc="Whistle against what it replaced"><strong>Whistle against what it replaced.</strong></p>
 <ul>
@@ -237,7 +237,7 @@
 
 <p>Shrinking the models further would cost answer quality, and Moonshine's vocabulary can't be cut the way SmolLM2's can: its token ids aren't ordered by frequency. The fix that worked was <em>how</em> the weights come back:</p>
 <ul>
-<li><strong>Sequential reads.</strong> Reading the file with large <code>pread</code> calls fills the same <a href="https://en.wikipedia.org/wiki/Page_cache">page cache</a> the mapping uses, at 80 MB/s instead of ~6 MB/s.</li>
+<li><strong>Sequential reads.</strong> Reading the file with large <a href="https://man7.org/linux/man-pages/man2/pread.2.html"><code>pread</code></a> calls fills the same <a href="https://en.wikipedia.org/wiki/Page_cache">page cache</a> the mapping uses, at 80 MB/s instead of ~6 MB/s.</li>
 <li><strong>Speech model first.</strong> acesrv tells localsirid to load the speech model the moment Siri starts listening, while you're still talking.</li>
 <li><strong>Language model next.</strong> Only the parts of the LLM a forward pass touches are read, right after the transcript goes back to Siri.</li>
 <li><strong>Locked until the answer is done.</strong> Even right after that read, Siri's memory pressure kept evicting pages, and the model read them back one 4 KiB page fault at a time: 1,300 to 3,500 of them while reading a 13-token question, and hundreds more during the answer. So localsirid now pins the model with <a href="https://man7.org/linux/man-pages/man2/mlock.2.html"><code>mlock</code></a>, one megabyte at a time as it reads it, and releases it after the answer. Page faults dropped to zero, reading the question went from 3.6–4.5 s to 2.8–3.6 s, and nothing got killed for lack of memory. What remains of the gap to the warm, Siri-less numbers is Siri's own animation, which takes about 17% of the CPU while you wait.</li>
