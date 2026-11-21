@@ -698,7 +698,7 @@
       }
       return { err, scales, rel: Math.sqrt(e2 / w2), rowBits: C * 4 + (C / gs) * 32 };
     };
-    const wsvg = $(fig, '[data-v=w]'), esvg = $(fig, '[data-v=e]'), info = $(fig, '[data-v=info]'), store = $(fig, '[data-v=store]'), tab = $(fig, '.sx-gtab');
+    const wsvg = $(fig, '[data-v=w]'), ssvg = $(fig, '[data-v=s]'), esvg = $(fig, '[data-v=e]'), info = $(fig, '[data-v=info]'), store = $(fig, '[data-v=store]'), tab = $(fig, '.sx-gtab');
     const MAXBITS = C * 4 + 16 * 32;
     let cur = null, curGs = 64;
     const draw = () => {
@@ -714,18 +714,19 @@
         }
         if (state.out) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outl[r][c]) kids.push(mk('rect', { x: c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
         if (labels) for (let r = 0; r < R; r++) st.scales[r].forEach((sc, g) => { const t = mk('text', { x: (g + .5) * gs * CW, y: r * RH + RH * .5, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gv' }); t.textContent = sc.mx.toFixed(1); kids.push(t); });   // each group's scale, on its cells
-        kids.push(mk('rect', { x: 1, y: state.sel * RH + 1, width: C * CW - 2, height: RH - 2, class: 'sel' }));
         return kids;
       };
       const wcol = (r, c) => { const v = val(r, c), p = Math.min(100, Math.abs(v) / 3 * 100); return `color-mix(in srgb, var(${v >= 0 ? '--sx-red' : '--sx-blue'}) ${p}%, var(--bg))`; };
       const ecol = (r, c) => `color-mix(in srgb, var(--sx-red) ${Math.min(100, st.err[r][c] / .5 * 100)}%, var(--bg))`;
-      const bars = [];
-      st.scales[state.sel].forEach((s, g) => {
-        const h = Math.max(1, s.mx / gm * (BARH - 14)), x0 = g * gs * CW + 1, bw = gs * CW - 2;
-        bars.push(mk('rect', { x: x0, y: R * RH + 4 + BARH - h, width: bw, height: h, class: s.mx > 3 ? 'big' : 'sc' }));
-        if (bw >= 24) { const t = mk('text', { x: x0 + bw / 2, y: R * RH + 4 + BARH - h - 3, 'text-anchor': 'middle', class: 'lbl' }); t.textContent = s.mx.toFixed(1); bars.push(t); }
-      });
-      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH + BARH + 6}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol, true), ...bars);
+      const scol = (r, g) => `color-mix(in srgb, var(--sx-gold) ${Math.max(10, st.scales[r][g].mx / gm * 100)}%, var(--bg))`;
+      const skids = [];
+      for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) skids.push(mk('rect', { x: g * gs * CW, y: r * RH, width: gs * CW + .4, height: RH + .4 }, `fill:${scol(r, g)}`));
+      if (ng > 1) {
+        for (let r = 1; r < R; r++) skids.push(mk('line', { x1: 0, x2: C * CW, y1: r * RH, y2: r * RH, class: 'gl' }));
+        for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) skids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH, y2: (r + 1) * RH, class: 'gl' }));
+      }
+      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol, true));
+      ssvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); ssvg.replaceChildren(...skids);
       esvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); esvg.replaceChildren(...cells(esvg, R * RH, ecol));
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
@@ -735,17 +736,16 @@
       tab.replaceChildren(...rows.map((r, i) => { const tr = el('tr'); r.slice(0, 3).forEach((t, j) => tr.append(el(i ? 'td' : 'th', j ? 'num' : null, t))); if (i) { tr.dataset.i = r[3]; if (r[3] === state.g) tr.className = 'on'; } return tr; }));
     };
     const pick = (e) => {
-      const rc = wsvg.getBoundingClientRect(), e0 = e.currentTarget === esvg ? esvg.getBoundingClientRect() : rc;
+      const e0 = e.currentTarget.getBoundingClientRect();
       const x = (e.clientX - e0.left) / e0.width * C * CW, y = (e.clientY - e0.top) / e0.width * C * CW;
       return { c: Math.floor(x / CW), r: Math.floor(y / RH) };
     };
-    [wsvg, esvg].forEach((svg) => {
+    [wsvg, ssvg, esvg].forEach((svg) => {
       svg.addEventListener('mousemove', (e) => {
         const p = pick(e); if (p.r < 0 || p.r >= R || p.c < 0 || p.c >= C) return;
         const g = Math.floor(p.c / curGs), s = cur.scales[p.r][g];
         info.textContent = `Row ${p.r + 1}, group ${g + 1} of ${C / curGs}: weight ${val(p.r, p.c).toFixed(2)}, largest in group ${s.mx.toFixed(2)}, gap between levels ${s.step.toFixed(2)}, error ${cur.err[p.r][p.c].toFixed(2)}.`;
       });
-      svg.addEventListener('click', (e) => { const p = pick(e); if (p.r >= 0 && p.r < R) { state.sel = p.r; draw(); } });
     });
     tab.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) { state.g = +tr.dataset.i; $(fig, '[data-k=g]').value = state.g; draw(); } });
     $(fig, '[data-k=g]').addEventListener('input', (e) => { state.g = +e.target.value; draw(); });
