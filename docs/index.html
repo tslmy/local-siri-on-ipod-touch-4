@@ -209,6 +209,21 @@
 <li><strong>It is its own inverse.</strong> The rows are <a href="https://en.wikipedia.org/wiki/Orthogonal_matrix">orthogonal</a> and the matrix is symmetric, so applying it twice gives back the original. Rotating loses nothing.</li>
 </ul>
 
+<p>To see the first property at work, try it yourself. Orange is a group of weights as they come, with some outliers mixed in; blue is the same group after rotation. The histograms below the bars show where the values sit on the number line:</p>
+
+<figure class="widget wide" data-widget="spread">
+  <figcaption><strong>What rotation does to a group.</strong> Each bar is one weight. Make the group bigger and watch one tall spike turn into many short bars of random sign, then add outliers and watch the pile in the middle turn into a bell. Both rows share one scale, so the heights are directly comparable.</figcaption>
+  <div class="sx-controls">
+    <label>weights <output data-o="n">64</output> <input type="range" data-k="n" min="1" max="8" value="6" aria-label="Weights in the group (power of two)"></label>
+    <label>outliers <output data-o="k">1</output> <input type="range" data-k="k" min="0" max="16" value="1" aria-label="Number of outliers"></label>
+    <label>outlier size <output data-o="s">20</output>× <input type="range" data-k="s" min="1" max="50" value="20" aria-label="Outlier size in multiples of a normal weight"></label>
+    <button data-act="new">new group</button>
+    <button data-act="zoom" aria-pressed="false">zoom each histogram</button>
+  </div>
+  <svg class="sx-sp" viewBox="0 0 640 330" role="img" aria-label="Bars and histograms of a group of weights before and after rotation"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
 <p><strong>Step 3: snap to a codebook made for bell curves.</strong> Because rotated groups all have roughly the same bell shape (once divided by their length), one set of levels can serve all of them. The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook. Each weight stores the 4-bit index of its nearest level. With 2 bits there are only 4 levels; Whistle mixes 2- and 4-bit layers.</p>
 
 <figure class="widget wide" data-widget="cq">
