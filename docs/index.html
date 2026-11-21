@@ -655,21 +655,26 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 
-<p>Step 2 leaves every group rotated but still at its own length. Here are four such groups of two weights, as points. With the plain scheme from step 1, each needs a grid of levels sized to its own largest weight:</p>
+<p>Before the codebook, a tempting thought needs breaking: that levels are cheap to store. That holds only for evenly spaced levels, where the scale alone fixes all of them. Evenly spaced levels fit the weights badly, so let us see what better ones cost.</p>
+
+<p>Take a group of 64 weights, which is the group size this project uses for SmolLM2 (Whistle uses 128). The 64 weights hardly spread evenly: most sit near zero and a few lie far out. Evenly spaced levels would be wasted on the sparse outer region, so we want the set of levels that fits <em>this</em> group best, which is not evenly spaced.</p>
+
+<p>To see such a set, pick two of the 64 weights at random, say the 21st and the 58th, and plot them as one point. The levels of the group, applied to both axes, make a grid around it. Then take the weights at the same two positions in another group: a different point, and a different set of levels, because the other group has its own weights. Add groups and levels below and watch the table:</p>
 
 <figure class="widget wide" data-widget="grids">
-  <figcaption><strong>Rotated groups, each with its own grid.</strong> Four groups of two weights after rotation, and the grid of levels that would be built around each one. Each square reaches its group's largest weight, and its dots are that group's levels. Add levels and watch the table grow.</figcaption>
+  <figcaption><strong>Every group has its own levels.</strong> Each colored point is the 21st and 58th weight of one group of 64, and the grid of the same color is built from that group's levels, which are not evenly spaced. The numbers are made up for illustration.</figcaption>
   <div class="sx-controls">
+    <label>Groups <input type="range" min="1" max="4" step="1" value="2" data-k="n"> <output data-o="n"></output></label>
     <label>Levels per axis <input type="range" min="2" max="8" step="1" value="4" data-k="l"> <output data-o="l"></output></label>
   </div>
-  <svg class="sx-sz" style="max-width:22rem;margin:0 auto" viewBox="0 0 350 340" role="img" aria-label="Four groups of two weights as points, each surrounded by its own square grid of quantization levels, in four different sizes"></svg>
+  <svg class="sx-sz" style="max-width:22rem;margin:0 auto" viewBox="0 0 350 340" role="img" aria-label="Weights 21 and 58 of up to four groups as points, each with a grid built from that group's own unevenly spaced levels"></svg>
   <table class="sx-stat"></table>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>That is the problem steps 1 and 2 leave us with, and we can now solve it. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat most of the savings (the numbers are in "Taking stock" below).</p>
+<p>The table keeps growing: one row for every group, one column for every level. Each number takes 32 bits, and a group's 64 weights are stored as indices into its row. A full table is therefore a large part of what a group costs (at 16 levels, two thirds of it), and it is what the next step has to get rid of. The way out is to make every group look the same, so that one shared row serves them all. The arithmetic shows why that matters:</p>
 
-<p>The arithmetic is short. Take groups of \(G\) weights, \(b\)-bit indices, and \(c\)-bit numbers (\(c = 32\) here). Anything stored once for the whole model is negligible, so what counts is what is stored for every group:</p>
+<p>Take groups of \(G\) weights, \(b\)-bit indices, and \(c\)-bit numbers (\(c = 32\) here). Anything stored once for the whole model is negligible, so what counts is what is stored for every group:</p>
 \[ \begin{aligned} \text{shared codebook:}\quad & b + \frac{c}{G} \\ \text{fresh codebook per group:}\quad & b + \frac{2^b\,c}{G} \end{aligned} \]
 
 <figure class="widget wide">
@@ -983,6 +988,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=104" defer></script>
+    <script src="assets/explainer.js?v=106" defer></script>
   </body>
 </html>

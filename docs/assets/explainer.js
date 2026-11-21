@@ -1174,32 +1174,35 @@
     fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
   };
 
-  // 11b. Four rotated groups of two weights, each with its own grid of levels (the problem step 3 solves)
+  // 11b. Two weights of a group as a point, with the grid built from that group's own (unevenly spaced) levels; more groups make the table grow
   const gridsFig = (fig) => {
     const svg = $(fig, 'svg'), tab = $(fig, '.sx-stat'), note = $(fig, '.sx-readout');
-    const P = [[.45, .30], [-.95, .75], [1.45, -1.20], [-1.85, -1.60]], S = 300 / 4.4, cx = 175, cy = 170;
+    const Q = { 2: [.7979], 3: [0, 1.224], 4: [.4528, 1.510], 5: [0, .7646, 1.724], 6: [.3177, 1.000, 1.894], 7: [0, .5606, 1.188, 2.033], 8: [.2451, .7560, 1.344, 2.152] };   // Lloyd-Max levels of a bell curve, positive half
+    const SIGMA = [.9, .5, 1.25, .7], P = [[.70, -.38], [-.52, .29], [1.55, .90], [-.85, -1.10]], S = 300 / 6.4, cx = 175, cy = 170;
     const X = (v) => cx + v * S, Y = (v) => cy - v * S, f2 = (v) => (v < 0 ? '−' : '') + Math.abs(v).toFixed(2);
+    const levelsOf = (g, L) => { const pos = Q[L], neg = (L % 2 ? pos.slice(1) : pos).slice().reverse().map((q) => -q); return [...neg, ...pos].map((q, k) => SIGMA[g] * q * (1 + .09 * Math.sin(7 * g + 3 * k + 1))); };
     const draw = () => {
-      const L = +$(fig, '[data-k=l]').value; $(fig, '[data-o=l]').textContent = L;
-      const kids = [], line = (x1, y1, x2, y2) => sv('line', { x1, y1, x2, y2 }, 'stroke:var(--muted);stroke-width:1'), txt = (x, y, t) => { const e = sv('text', { x, y, class: 'lbl' }); e.textContent = t; return e; };
-      kids.push(line(X(-2.2), cy, X(2.2), cy), line(cx, Y(-2.2), cx, Y(2.2)), txt(X(2.2) + 6, cy + 4, 'w₁'), txt(cx + 6, Y(2.2) - 4, 'w₂'));
-      const m = P.map(([u, v]) => Math.max(Math.abs(u), Math.abs(v))), levels = (mm) => Array.from({ length: L }, (_, k) => mm * (-1 + 2 * k / (L - 1)));
-      [...P.keys()].sort((a, b) => m[b] - m[a]).forEach((i) => {
-        const col = `var(--pc${i})`; kids.push(sv('rect', { x: X(-m[i]), y: Y(m[i]), width: 2 * m[i] * S, height: 2 * m[i] * S }, `fill:none;stroke:${col};stroke-width:1.6`));
-        levels(m[i]).forEach((u) => levels(m[i]).forEach((v) => kids.push(sv('circle', { cx: X(u), cy: Y(v), r: L > 6 ? 1.8 : 2.4 }, `fill:${col}`))));
+      const L = +$(fig, '[data-k=l]').value, n = +$(fig, '[data-k=n]').value; $(fig, '[data-o=l]').textContent = L; $(fig, '[data-o=n]').textContent = n;
+      const kids = [], wire = (x1, y1, x2, y2, col, w, o) => sv('line', { x1, y1, x2, y2 }, `stroke:${col};stroke-width:${w};opacity:${o || 1}`), txt = (x, y, t) => { const e = sv('text', { x, y, class: 'lbl' }); e.textContent = t; return e; };
+      kids.push(wire(X(-3.2), cy, X(3.2), cy, 'var(--muted)', 1), wire(cx, Y(-3.2), cx, Y(3.2), 'var(--muted)', 1), txt(X(3.2) + 6, cy + 4, 'w₅₈'), txt(cx + 6, Y(3.2) - 4, 'w₂₁'));
+      const lv = [...Array(n).keys()].map((g) => levelsOf(g, L));
+      lv.forEach((ls, g) => {
+        const col = `var(--pc${g})`, lo = ls[0], hi = ls[ls.length - 1];
+        ls.forEach((u) => kids.push(wire(X(u), Y(lo), X(u), Y(hi), col, 1, .45), wire(X(lo), Y(u), X(hi), Y(u), col, 1, .45)));
+        ls.forEach((u) => ls.forEach((v) => kids.push(sv('circle', { cx: X(u), cy: Y(v), r: L > 6 ? 1.8 : 2.3 }, `fill:${col}`))));
       });
-      P.forEach(([u, v], i) => { const col = `var(--pc${i})`; kids.push(sv('circle', { cx: X(u), cy: Y(v), r: 9 }, `fill:var(--bg);stroke:${col};stroke-width:2.4`)); const t = sv('text', { x: X(u), y: Y(v) + 3.5, 'text-anchor': 'middle' }, 'fill:var(--text);font:bold 10px var(--sx-sans)'); t.textContent = i + 1; kids.push(t); });
+      P.slice(0, n).forEach(([u, v], g) => { const col = `var(--pc${g})`; kids.push(sv('circle', { cx: X(u), cy: Y(v), r: 9 }, `fill:var(--bg);stroke:${col};stroke-width:2.4`)); const t = sv('text', { x: X(u), y: Y(v) + 3.5, 'text-anchor': 'middle' }, 'fill:var(--text);font:bold 10px var(--sx-sans)'); t.textContent = g + 1; kids.push(t); });
       svg.replaceChildren(...kids);
-      const head = el('tr'); ['Group', 'Weights', 'Largest weight'].forEach((t, j) => head.append(el('th', j ? 'num' : null, t)));
-      const lh = el('th', 'num', `Levels on each axis (${L})`); lh.colSpan = L; head.append(lh);
-      tab.replaceChildren(head, ...P.map(([u, v], i) => {
-        const tr = el('tr'), sw = el('td'); sw.append(el('span', 'sx-sw', ''), document.createTextNode(` ${i + 1}`)); sw.firstChild.style.cssText = `display:inline-block;width:.7rem;height:.7rem;border:2px solid var(--pc${i});vertical-align:-1px`;
-        tr.append(sw, el('td', 'num', `(${f2(u)}, ${f2(v)})`), el('td', 'num', m[i].toFixed(2)));
-        levels(m[i]).forEach((q) => tr.append(el('td', 'num', f2(q)))); return tr;
+      const head = el('tr'); ['Group', '(w₂₁, w₅₈)'].forEach((t, j) => head.append(el('th', j ? 'num' : null, t)));
+      const lh = el('th', 'num', `Levels (${L})`); lh.colSpan = L; head.append(lh);
+      tab.replaceChildren(head, ...lv.map((ls, g) => {
+        const tr = el('tr'), sw = el('td'); sw.append(el('span', 'sx-sw', ''), document.createTextNode(` ${g + 1}`)); sw.firstChild.style.cssText = `display:inline-block;width:.7rem;height:.7rem;border:2px solid var(--pc${g});vertical-align:-1px`;
+        tr.append(sw, el('td', 'num', `(${f2(P[g][0])}, ${f2(P[g][1])})`)); ls.forEach((q) => tr.append(el('td', 'num', f2(q)))); return tr;
       }));
-      note.textContent = `${P.length} groups × ${L} × ${L} = ${P.length * L * L} grid points, and each group needs its own ${L} levels: ${P.length * L} numbers to store here, for just ${P.length} groups of two weights.`;
+      const bits = Math.ceil(Math.log2(L)), lvBits = L * 32, ixBits = 64 * bits;
+      note.textContent = `One group of 64 weights: ${L} levels × 32 bits = ${lvBits} bits for the levels, plus 64 indices × ${bits} bits = ${ixBits} bits, ${lvBits + ixBits} bits in all (${(lvBits / (lvBits + ixBits) * 100).toFixed(0)}% of it the levels). Every group in the model adds another row to this table.`;
     };
-    $(fig, '[data-k=l]').addEventListener('input', draw); draw();
+    fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
   };
 
   // 12. Why the kernel rotates the activations: the identity with real numbers, and the operation count
