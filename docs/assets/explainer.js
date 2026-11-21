@@ -925,9 +925,10 @@
     const state = { g: 3, out: true, nout: 6, size: 8, sel: 0 }; let seed = 7;
     const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const gauss = () => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
+    const spiky = () => gauss() * Math.exp(.7 * gauss()) / 1.63;   // each weight has its own random size, so most are small and a few are large, like real weights
     let base = [], outl = [], outList = [];
     const gen = () => {
-      base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => gauss() * s); });
+      base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => spiky() * s); });
       const rows = Array.from({ length: R }, (_, i) => i);     // outliers go in different rows, so each one is in a group of its own at any group size
       for (let i = R - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }
       outList = rows.map((r0) => ({ r: r0, c: Math.floor(rng() * C), sign: rng() < .5 ? -1 : 1, u: rng() }));
@@ -1045,7 +1046,7 @@
       svg.replaceChildren(...kids);
       const nOdd = flag.filter(Boolean).length / gs;
       note.textContent = nOdd
-        ? `Groups of ${gs}: the ${nOdd} gold groups contain an outlier. Before rotation, each puts one weight far out at about ${Math.sqrt(gs).toFixed(1)}σ and the other ${gs - 1} piled up near zero; after it, all ${gs} sit at similar sizes, inside the bell. The dashed curve is an ideal bell curve.`
+        ? `Groups of ${gs}: the ${nOdd} gold groups contain an outlier. Before rotation, each puts one weight far out at about ${Math.sqrt(gs).toFixed(1)}σ and the other ${gs - 1} piled up near zero; after it, all ${gs} sit at similar sizes, inside the bell. The blue groups change too: a few big weights among many small ones become evenly sized values, so the sharp peak with long tails turns into a bell. The dashed curve is an ideal bell curve.`
         : `Groups of ${gs}, no outliers right now. Raise "Groups with outliers" above to see how they show up. The dashed curve is an ideal bell curve.`;
     };
     groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
@@ -1132,6 +1133,26 @@
 
   const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
+  // Cross-references: a link with class "xref" scrolls to its target and raises a floating button that carries the reader back to the link
+  (() => {
+    const links = [...document.querySelectorAll('a.xref[href^="#"]')];
+    if (!links.length) return;
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches, behavior = reduce ? 'auto' : 'smooth';
+    const btn = el('button', 'xref-back', '↩ Back to where you were'); btn.type = 'button'; btn.hidden = true; document.body.append(btn);
+    let from = null, target = null, away = false, ticking = false;
+    const seen = (e) => { const r = e.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+    const hide = () => { btn.hidden = true; from = target = null; away = false; };
+    links.forEach((a) => a.addEventListener('click', (e) => {
+      const t = document.getElementById(a.getAttribute('href').slice(1)); if (!t) return;
+      e.preventDefault(); from = a; target = t; away = false; btn.hidden = false;
+      t.scrollIntoView({ behavior, block: 'start' });
+    }));
+    btn.addEventListener('click', () => { const a = from; hide(); if (a) { a.scrollIntoView({ behavior, block: 'center' }); a.focus({ preventScroll: true }); } });
+    addEventListener('scroll', () => {   // once the reader has reached the target and later sees the link again on their own, the button has done its job
+      if (!from || ticking) return; ticking = true;
+      requestAnimationFrame(() => { ticking = false; if (!from) return; if (seen(target)) away = true; else if (away && seen(from)) hide(); });
+    }, { passive: true });
+  })();
   // A contents column that floats on the left of wide windows: every numbered section, the 4-bit section's steps, and a highlight on the one being read
   (() => {
     const heads = [...document.querySelectorAll('.siri-explainer h2[id]:not(#contents), .siri-explainer h3[id], .siri-explainer h4[id], .siri-explainer [data-toc]')];
