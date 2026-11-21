@@ -680,7 +680,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <h4 id="s3-shared" data-toc="One shared codebook">One shared codebook</h4>
 
-<p>That table is what the rest of this step gets rid of. The way out is to make every group look the same, so that one shared row serves them all. Then each group stores only its indices and one scale, and the codebook is stored once for the whole model. Here is what one group stores in each scheme, drawn in proportion. Move the sliders to see what the price depends on:</p>
+<p>That table is what the rest of this step gets rid of. The way out is to make every group look the same, so that one shared row serves them all. What "the same" has to mean is worked out in the next two parts. Then each group stores only its indices and one scale, and the codebook is stored once for the whole model. Here is what one group stores in each scheme, drawn in proportion. Move the sliders to see what the price depends on:</p>
 
 <figure class="widget wide" data-widget="codebooks">
   <figcaption><strong>What is stored for one group.</strong> The same three kinds of data: the indices (blue), the group's scale (gold) and a codebook (red).</figcaption>
@@ -707,7 +707,9 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <p>So sharing is what makes small groups affordable: each group may only pay for a single scale.</p>
 </details>
 
-<p>Start with the shape of the values. Trained weights are usually roughly bell-shaped, as one would expect: they start out as random Gaussian numbers, and training adds up many small nudges. Here are the real weights of SmolLM2. Each group is first divided by its length, so that every group is measured on the same scale. Under the plot, the readout gives the <a href="https://en.wikipedia.org/wiki/Kurtosis">kurtosis</a> of the values, which is 3 for a bell curve:<span class="sidenote-wrap"><label for="sn-5" class="sidenote-number"></label><input type="checkbox" id="sn-5" class="sidenote-toggle"><span class="sidenote">Kurtosis measures how heavy the tails are. It is the average of \(x^4\) when the values \(x\) are measured in standard deviations: a bell curve scores 3, a sharper peak with long tails scores more, and values packed into a narrow range score less.</span></span></p>
+<h4 id="s3-shape" data-toc="What shape do the values have?">What shape do the values have?</h4>
+
+<p>Trained weights are usually roughly bell-shaped: they start out as random Gaussian numbers, and training adds up many small nudges. Here are the real weights of SmolLM2. Each group is first divided by its length, so that every group is measured on the same scale. Under the plot, the readout gives the <a href="https://en.wikipedia.org/wiki/Kurtosis">kurtosis</a> of the values, which is 3 for a bell curve:<span class="sidenote-wrap"><label for="sn-5" class="sidenote-number"></label><input type="checkbox" id="sn-5" class="sidenote-toggle"><span class="sidenote">Kurtosis measures how heavy the tails are. It is the average of \(x^4\) when the values \(x\) are measured in standard deviations: a bell curve scores 3, a sharper peak with long tails scores more, and values packed into a narrow range score less.</span></span></p>
 
 <figure class="widget wide" data-widget="hist" data-mode="single">
   <figcaption><strong>SmolLM2's weights as a histogram.</strong> Each bar counts the weights in a narrow range of values, measured in standard deviations (σ) after dividing each group by its length. The dashed curve is an ideal bell curve.</figcaption>
@@ -741,21 +743,22 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p>For groups of 64:</p>
 <ul>
-<li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9, which is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. (A normal distribution would score 3. A group of fixed length cannot hold extreme values, so it comes out a little below.) The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
+<li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9. That is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. It sits a little below the 3 of a normal distribution because a group of fixed length cannot hold extreme values. The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
 <li><strong>It helps most where the weights are least bell-shaped.</strong> The embedding goes from a kurtosis of 5.2 to 2.9. The same holds for groups with an outlier, as in the toy examples earlier. So the rotation is less a source of the bell shape than a guarantee of it.</li>
-<li><strong>Without dividing by the length, the picture is much worse.</strong> Groups differ a lot in size, so the values are a mixture of many bell curves of different widths, which has heavy tails (kurtosis 5.4, largest value 51σ). Rotating helps (3.7, 25σ) but cannot make the groups alike: it mixes the weights inside a group and leaves the group's size alone. That is why the length is divided out first, and stored as the scale.</li>
+<li><strong>Without dividing by the length, the picture is much worse.</strong> Groups differ a lot in size, so the values are a mixture of many bell curves of different widths, which has heavy tails (kurtosis 5.4, largest value 51σ). Rotating helps (3.7, 25σ) but cannot make the groups alike: it mixes the weights inside a group and leaves the group's size alone. That is why the length is divided out first.</li>
 <li><strong>Small groups show little.</strong> In a group of 8 no value can exceed \(\sqrt{8} = 2.8\sigma\), so there are no tails to trim. Slide the group size up to see the effect grow.</li>
 </ul>
 </details>
 
-<p>That shape is what the next steps rely on:</p>
+<h4 id="s3-levels" data-toc="Placing the levels">Placing the levels</h4>
+
+<p>Knowing the shape settles two things:</p>
 <ul>
-<li><strong>Evenly spaced levels suit this badly.</strong> They are wasted on the tails, where almost nothing lands, and leave the crowded middle coarsely rounded.</li>
-<li><strong>Because the shape is known in advance, the levels can be designed once, ahead of time.</strong> They need only be dense where the bell is tall and sparse where it is short.</li>
+<li><strong>The levels can be designed once, ahead of time.</strong> They need only be dense where the bell is tall and sparse where it is short, which evenly spaced levels are not.</li>
 <li><strong>That only works if every group has the same spread \(\sigma\) as well as the same shape.</strong> The best levels for a bell curve of spread \(\sigma\) are the best levels for a bell curve of spread 1, multiplied by \(\sigma\), so the spread is the one thing that must be taken out. Dividing each group by its own length does that: the length is \(\sqrt{G}\) times the group's root-mean-square, so after the division every group has the same \(\sigma\), namely \(1/\sqrt{G}\) per weight. One shared set of levels, made for that one \(\sigma\), then serves every group, with nothing extra to store per group.<span class="sidenote-wrap"><label for="sn-3" class="sidenote-number"></label><input type="checkbox" id="sn-3" class="sidenote-toggle"><span class="sidenote">A side benefit is speed. A 4-bit codebook has only 16 entries, which fit in one CPU register, so many weights can be looked up at once (step 4). Speed is not why the codebook exists: the aim of these steps is a smaller model.</span></span></li>
 </ul>
 
-<p>So the step has these parts:</p>
+<p>Putting it together, the step does this:</p>
 <ul>
 <li>Divide each group by its length, which is stored as the group's scale. What is left is a direction, so every group is on the same footing.</li>
 <li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
@@ -989,6 +992,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=113" defer></script>
+    <script src="assets/explainer.js?v=114" defer></script>
   </body>
 </html>
