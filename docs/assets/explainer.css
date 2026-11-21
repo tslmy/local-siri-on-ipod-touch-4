@@ -167,3 +167,6 @@
 .sx-bitrow .b.s { background: var(--sx-red); color: #fff; }
 .sx-bitrow .b.e { background: var(--sx-gold); color: #000; }
 .sx-bitrow .b.i { background: var(--sx-blue); color: #fff; width: 1.4rem; }
+.sx-cq .lv { fill: var(--text); font: 10px var(--sx-mono); }
+.sx-cq .bn { fill: var(--muted); font: 10px var(--sx-mono); }
+.sx-cq .selk { fill: var(--accent); font-weight: bold; }

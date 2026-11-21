@@ -369,13 +369,31 @@
       const m = Math.max(...w.map(Math.abs)), n = 2 ** state.bits, step = 2 * m / (n - 1);
       const idxOf = (x) => Math.round((x + m) / step), levels = Array.from({ length: n }, (_, k) => -m + k * step), nearest = (x) => -m + idxOf(x) * step;
       const X = (x) => 20 + ((x + RANGE) / (2 * RANGE)) * 600, big = w.findIndex((x) => Math.abs(x) === m);
-      const kids = [mk('line', { x1: 20, x2: 620, y1: 112, y2: 112, class: 'axis' })];
-      levels.forEach((l) => kids.push(mk('line', { x1: X(l), x2: X(l), y1: 104, y2: 120, class: 'level' })));
+      const kids = [mk('line', { x1: 20, x2: 620, y1: 128, y2: 128, class: 'axis' })];
+      levels.forEach((l) => kids.push(mk('line', { x1: X(l), x2: X(l), y1: 120, y2: 136, class: 'level' })));
       w.forEach((x, i) => {
-        const y = 18 + (i % 6) * 13;
-        kids.push(mk('line', { x1: X(x), x2: X(nearest(x)), y1: y, y2: 104, class: 'snap' }));
+        const y = 34 + (i % 6) * 13;
+        kids.push(mk('line', { x1: X(x), x2: X(nearest(x)), y1: y, y2: 120, class: 'snap' }));
         kids.push(mk('circle', { cx: X(x), cy: y, r: 4, class: (state.outlier && i === big ? 'dot out' : 'dot') + (i === state.sel ? ' sel' : ''), 'data-i': i }));
       });
+      // level numbers under the ticks: decimal, and binary when it fits (staggered over two rows)
+      const gap = X(step) - X(0), selK = idxOf(w[state.sel]);
+      let stride = 1; while (gap * stride < 15 && stride < n) stride *= 2;
+      const showBin = gap * stride * 2 >= state.bits * 6.2 + 4;
+      const text = (x, y, str, cls) => { const t = mk('text', { x, y, 'text-anchor': 'middle', class: cls }); t.textContent = str; return t; };
+      levels.forEach((l, k) => {
+        if (k !== selK && (k % stride || Math.abs(X(l) - X(levels[selK])) < state.bits * 6.2 + 4)) return;
+        const cls = k === selK ? ' selk' : '';
+        kids.push(text(X(l), 150, String(k), 'lv' + cls));
+        if (showBin || k === selK) kids.push(text(X(l), 162 + (showBin && (k / stride) % 2 ? 11 : 0), k.toString(2).padStart(state.bits, '0'), 'bn' + cls));
+      });
+      // value ruler above the dots: the actual weights
+      kids.push(mk('line', { x1: 20, x2: 620, y1: 18, y2: 18, class: 'axis' }));
+      for (let t = -10; t <= 10; t++) {
+        const v = t * 0.05, major = t % 5 === 0;
+        kids.push(mk('line', { x1: X(v), x2: X(v), y1: 18, y2: major ? 25 : 22, class: 'axis' }));
+        if (major) kids.push(text(X(v), 11, String(Number(v.toFixed(2))), 'lbl'));
+      }
       svg.replaceChildren(...kids);
       const e2 = w.reduce((a, x) => a + (x - nearest(x)) ** 2, 0), p2 = w.reduce((a, x) => a + x * x, 0);
       note.textContent = `${state.bits} bit${state.bits > 1 ? 's' : ''} = ${n} levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(3)}.`;
