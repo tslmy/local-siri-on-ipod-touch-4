@@ -7,7 +7,7 @@
     <meta name="description" content="How the genuine iOS 6 Siri interface was brought to an iPod touch 4th generation and wired to speech recognition and a language model that run on the iPod itself." />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
-    <link rel="stylesheet" href="assets/explainer.css?v=10" />
+    <link rel="stylesheet" href="assets/explainer.css?v=12" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -101,11 +101,11 @@
   <figcaption><strong>Repairing a decached library.</strong> Each square is a pointer-sized slot in AssistantUI's data segment. The library is loaded at a different address than in the 4S cache: press "load on the iPod" to see which slots break, then apply each repair.</figcaption>
   <div class="sx-controls">
     <button data-act="load">load on the iPod</button>
-    <button data-fix="rebase">rebases (2,479)</button>
-    <button data-fix="bind">recovered binds (204)</button>
-    <button data-fix="lazy">eager lazy pointers (61)</button>
-    <button data-fix="stub">stubs (3)</button>
-    <button data-fix="objc">objc method lists (47)</button>
+    <button data-fix="rebase" aria-pressed="false">rebases (2,479)</button>
+    <button data-fix="bind" aria-pressed="false">recovered binds (204)</button>
+    <button data-fix="lazy" aria-pressed="false">eager lazy pointers (61)</button>
+    <button data-fix="stub" aria-pressed="false">stubs (3)</button>
+    <button data-fix="objc" aria-pressed="false">objc method lists (47)</button>
     <button data-act="reset">reset</button>
   </div>
   <div class="sx-mem"></div>
@@ -188,9 +188,26 @@
 
 <h3 id="codebook">How a weight fits in 4 bits</h3>
 
-<p>Both models are mostly big matrices of weights, and each answer word means reading all of them once (§1: memory bandwidth). In 32-bit floats SmolLM2 alone is 538 MB, twice the iPod's RAM, so every weight has to shrink to a few bits. The trick Whistle uses, codebook quantization, is easiest to follow by starting with plain quantization and then adding four refinements, one for each problem the previous version runs into.</p>
+<p>Both models are mostly big matrices of weights, and each answer word means reading all of them once (§1: memory bandwidth). In 32-bit floats SmolLM2 alone is 538 MB, twice the iPod's RAM, so every weight has to shrink to a few bits. The trick Whistle uses, codebook quantization, is easiest to follow by starting with plain quantization and then adding four refinements. Each one fixes a problem the previous version runs into:</p>
 
-<p><strong>First, plain quantization.</strong> A weight is a number such as 0.137, and a float stores it in 32 bits. Quantization stores a rougher copy instead. Choose a small set of allowed values, called levels, and for each weight remember only which level is nearest. With 16 levels the index fits in 4 bits, an eighth of the 32, so the model shrinks eightfold. The price is precision: every weight moves to its nearest level, and the distance it moves is its rounding error. The simplest set of levels is spread evenly from −<em>m</em> to +<em>m</em>, where <em>m</em> is the largest weight in absolute value. That one number, the scale, is stored alongside so the levels can be turned back into real values.</p>
+<div class="wide"><table>
+<thead><tr><th>Stage</th><th>Idea</th><th>Problem it fixes</th></tr></thead>
+<tbody>
+<tr><td>Plain quantization</td><td>Round each weight to the nearest of a few evenly spaced levels</td><td>Starting point</td></tr>
+<tr><td>1. Groups</td><td>Each group of 64 weights gets its own scale</td><td>One outlier stretches the levels for the whole matrix</td></tr>
+<tr><td>2. Rotation</td><td>Multiply each group by a Hadamard matrix</td><td>A spike still stretches the levels inside its own group</td></tr>
+<tr><td>3. Codebook</td><td>Place the levels for a bell curve, not evenly</td><td>Rotated values are bell-shaped, so even levels waste precision</td></tr>
+<tr><td>4. Kernel</td><td>Rotate the activations once, never rebuild the weights</td><td>Decoding 135 million weights per word is too slow</td></tr>
+</tbody>
+</table></div>
+
+<p><strong>First, plain quantization.</strong> A weight is a number such as 0.137, and a float stores it in 32 bits. Quantization stores a rougher copy instead:</p>
+<ul>
+<li><strong>Levels.</strong> Choose a small set of allowed values, called levels.</li>
+<li><strong>Index.</strong> For each weight, remember only which level is nearest. With 16 levels the index fits in 4 bits, an eighth of the 32, so the model shrinks eightfold.</li>
+<li><strong>Rounding error.</strong> Every weight moves to its nearest level, and the distance it moves is its rounding error. That is the price: precision.</li>
+<li><strong>Scale.</strong> The simplest levels are spread evenly from −<em>m</em> to +<em>m</em>, where <em>m</em> is the largest weight in absolute value. That one number is stored alongside, so the levels can be turned back into real values.</li>
+</ul>
 
 <p>Slide the number of bits and watch the error. Then add an outlier:</p>
 
@@ -206,9 +223,22 @@
   <div class="sx-bits"></div>
 </figure>
 
-<p>Adding bits helps, but there is a worse problem. Most weights are small, yet a few are much larger: the "outliers" that <a href="https://arxiv.org/abs/2404.00456">much of the quantization literature</a> is about. Because the levels must reach the largest weight, one outlier stretches them so far apart that the ordinary weights, which all sit near zero, round to the few levels there. The error jumps even though almost no weight changed. With 2 bits there are only 4 levels to begin with, so this hurts most there. A single scale for everything is the weak point.</p>
+<p>Adding bits helps, but there is a worse problem: the "outliers" that <a href="https://arxiv.org/abs/2404.00456">much of the quantization literature</a> is about.</p>
+<ul>
+<li>Most weights are small, yet a few are much larger.</li>
+<li>The levels must reach the largest weight, so one outlier stretches them far apart, and the ordinary weights near zero round to just the few levels there.</li>
+<li>The error jumps even though almost no weight changed.</li>
+<li>With 2 bits there are only 4 levels to begin with, so this hurts most there.</li>
+</ul>
+<p>A single scale for everything is the weak point.</p>
 
-<p><strong>Step 1: cut each row into groups.</strong> A weight matrix has millions of numbers, and one outlier anywhere would stretch the levels for all of them. So a row is split into groups of 64 weights (128 in Whistle), and each group gets its own scale, so an outlier only spoils its own group. The scale is the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a> (the square root of the sum of squares), stored once. Inside the group, each weight then only has to say "which of 16 levels am I closest to", and 16 levels take 4 bits.<span class="sidenote-wrap"><label for="sn-3" class="sidenote-number"></label><input type="checkbox" id="sn-3" class="sidenote-toggle"><span class="sidenote">Why groups along a row, and not down a column or in square tiles? A layer computes each output as a dot product along one row, so a scale that is constant over part of a row can be pulled out of the sum and multiplied in once per group. Rows are also read from flash in order, and the rotation in step 2 is shared by every row only when groups line up along it. Tiles are possible (some formats use 128×128 blocks) and need far fewer scales, but one outlier then spoils a much larger block. This project did not measure them.</span></span></p>
+<p><strong>Step 1: cut each row into groups.</strong></p>
+<ul>
+<li>A weight matrix has millions of numbers, and one outlier anywhere would stretch the levels for all of them.</li>
+<li>So each row is split into groups of 64 weights (128 in Whistle), and each group gets its own scale. An outlier now only spoils its own group.</li>
+<li>The scale is the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a> (the square root of the sum of squares), stored once.</li>
+<li>Inside the group, each weight only has to say "which of 16 levels am I closest to", and 16 levels take 4 bits.<span class="sidenote-wrap"><label for="sn-3" class="sidenote-number"></label><input type="checkbox" id="sn-3" class="sidenote-toggle"><span class="sidenote">Why groups along a row, and not down a column or in square tiles? A layer computes each output as a dot product along one row, so a scale that is constant over part of a row can be pulled out of the sum and multiplied in once per group. Rows are also read from flash in order, and the rotation in step 2 is shared by every row only when groups line up along it. Tiles are possible (some formats use 128×128 blocks) and need far fewer scales, but one outlier then spoils a much larger block. This project did not measure them.</span></span></li>
+</ul>
 
 <p>To get a feel for what grouping buys, try it on a toy matrix of 12 rows and 64 columns. Slide the number of groups per row up from one (a single scale for the whole row) and watch the rounding error. Here the 16 levels are spread evenly up to the largest weight in each group, the plain scheme from the figure above:</p>
 
@@ -231,9 +261,26 @@
   <table class="sx-gtab"></table>
 </figure>
 
-<p><strong>Step 2: rotate the group.</strong> Grouping keeps an outlier from spoiling its whole row, but inside its own group it still stretches the levels for the other 63 weights. What matters is how spiky the group is: its largest weight compared with the group's overall size, which is its length. You can't remove a spike without changing the weights, but you can change the axes you write them against.</p>
+<p><strong>Step 2: rotate the group.</strong> Grouping stops an outlier from spoiling its whole row, but inside its own group it still stretches the levels for the other 63 weights.</p>
+<ul>
+<li>What matters is how spiky the group is: its largest weight compared with the group's overall size, which is its length.</li>
+<li>You can't remove a spike without changing the weights.</li>
+<li>But you can change the axes you write them against.</li>
+</ul>
 
-<p>Picture a group of just three weights as a point in 3D space, one weight per axis. The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate. A point close to an axis has one big weight and two tiny ones, so the cube must be as large as the point is long, and the grid is coarse. Rotate the point, which is the same as writing it against rotated axes, and the same point with the same length has no dominant coordinate. The cube shrinks, the grid around the point gets finer, and the rounding error drops. Click a point to see its grid, drag the background to look around, and turn the slider. The camera button switches the view between staying with the axes (the points move) and staying with the points (the axes and the cube turn the other way); it is the same picture seen from two places:</p>
+<p>Picture a group of just three weights as a point in 3D space, one weight per axis:</p>
+<ul>
+<li>The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate.</li>
+<li>A point close to an axis has one big weight and two tiny ones. Its cube must be as large as the point is long, so the grid is coarse.</li>
+<li>Rotating the point is the same as writing it against rotated axes. The same point, with the same length, now has no dominant coordinate: the cube shrinks, the grid gets finer, and the rounding error drops.</li>
+</ul>
+<p>Things to try in the figure:</p>
+<ul>
+<li>Click a point to see its grid.</li>
+<li>Drag the background to look around.</li>
+<li>Turn the slider. At 60° the points are flattest, and at 120° they are spiky again.</li>
+<li>Flip the camera switch. Off, the camera stays with the axes and the points move. On, it stays with the points, and the axes and the cube turn the other way. It is the same picture seen from two places.</li>
+</ul>
 
 <figure class="widget wide" data-widget="rot3d">
   <figcaption><strong>Rotating four groups of three weights.</strong> Each dot is one group, a point on a sphere of length 1. The cube is the range its levels must cover, with 4 levels per axis (2 bits), and the gold line goes from the point to the level it rounds to. Rotating about the diagonal by 60° turns every axis-aligned spike into a flatter point; at 120° the points are spiky again.</figcaption>
@@ -241,17 +288,33 @@
     <label>Rotate <input type="range" min="0" max="120" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
     <button data-act="flat">60° (flattest)</button>
     <button data-act="reset">reset</button>
-    <button data-act="follow" aria-pressed="false">camera follows the axes</button>
+    <button data-act="follow" aria-pressed="false">camera follows the points</button>
   </div>
   <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="Four points in three dimensions with the cube of quantization levels around the selected point"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>Two things make this safe. A rotation keeps every point's length and can be undone exactly by rotating back, so no information is lost, and the rounding error is the same size whichever side you measure it on. It also costs no bits to store. With three weights there isn't much room: the largest coordinate falls from 100% of the length to about two thirds. With 64 weights there is a lot more: a single spike spread evenly over 64 outputs ends up at 1/8 of the length in each. Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by √n so it keeps lengths). The 2×2 one is [[1, 1], [1, −1]]. Each bigger one is four copies of the previous one, with the bottom-right copy negated:</p>
+<p>Why this is safe:</p>
+<ul>
+<li><strong>Nothing is lost.</strong> A rotation keeps every point's length and can be undone exactly by rotating back, so the rounding error is the same size whichever side you measure it on.</li>
+<li><strong>It costs no bits.</strong> There is nothing extra to store.</li>
+</ul>
+<p>And how much it flattens depends on how many weights share the rotation. A lone spike of any size ends up, after a Hadamard rotation, equally spread over all the outputs:</p>
+<div class="wide"><table>
+<thead><tr><th>Weights in the group</th><th class="num">Largest coordinate after rotating a lone spike</th></tr></thead>
+<tbody>
+<tr><td>1 (nothing to spread over)</td><td class="num">100% of the length</td></tr>
+<tr><td>3 (the figure above reaches about two thirds for all three axes at once)</td><td class="num">at best 58%</td></tr>
+<tr><td>8</td><td class="num">35%</td></tr>
+<tr><td>64</td><td class="num">12.5% (1/8)</td></tr>
+<tr><td>128</td><td class="num">8.8%</td></tr>
+</tbody>
+</table></div>
+<p>Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by √n so it keeps lengths). The 2×2 one is [[1, 1], [1, −1]]. Each bigger one is four copies of the previous one, with the bottom-right copy negated:</p>
 
 <figure class="widget wide" data-widget="hadamard">
   <figcaption><strong>Building a Walsh–Hadamard matrix by doubling.</strong> Blue is +1, red is −1. Pick a size, then click a row to see what it computes.</figcaption>
-  <div class="sx-controls"><button data-n="2">2×2</button><button data-n="4">4×4</button><button data-n="8">8×8</button><button data-n="16" aria-pressed="true">16×16</button></div>
+  <div class="sx-controls"><span class="sx-seg"><button data-n="2">2×2</button><button data-n="4">4×4</button><button data-n="8">8×8</button><button data-n="16" aria-pressed="true">16×16</button></span></div>
   <div class="sx-had"></div>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
@@ -277,22 +340,57 @@
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p><strong>Why not PCA?</strong> If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar, and PCA is also a rotation. But it has the opposite goal. PCA looks at many vectors, finds the directions in which they vary most, and rotates so those become the axes. That piles the energy into a few coordinates, which is what you want when compressing by throwing the rest away. For rounding it is the wrong thing, because a coordinate that dominates is exactly the outlier we are trying to avoid. The Hadamard rotation uses no data at all and spreads the energy evenly. Here are both, applied to the same 24 groups of 8 weights:</p>
+<p><strong>Why not PCA?</strong> If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar. PCA is also a rotation, but with the opposite goal:</p>
+<div class="wide"><table>
+<thead><tr><th></th><th>PCA</th><th>Hadamard (here)</th></tr></thead>
+<tbody>
+<tr><td>Chosen from</td><td>The data: the directions many vectors vary along most</td><td>Nothing, it is fixed</td></tr>
+<tr><td>Effect</td><td>Piles the energy into a few coordinates</td><td>Spreads the energy evenly over all coordinates</td></tr>
+<tr><td>Good for</td><td>Compressing by dropping the small coordinates</td><td>Rounding, where a dominant coordinate is the outlier we want to avoid</td></tr>
+<tr><td>Needs</td><td>A rotation fitted to each layer's data, and stored</td><td>No stored matrix</td></tr>
+<tr><td>Fast form</td><td>A general matrix multiply</td><td>Add-and-subtract butterfly (step 4)</td></tr>
+</tbody>
+</table></div>
+<p>Here are both, applied to the same 24 groups of 8 weights:</p>
 
 <figure class="widget wide" data-widget="pca">
   <figcaption><strong>PCA and the Hadamard rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
   <div class="sx-controls">
-    <button data-ds="spiky" aria-pressed="true">each group has one big weight</button>
-    <button data-ds="corr" aria-pressed="false">weights move together</button>
+    <span class="sx-seg"><button data-ds="spiky" aria-pressed="true">each group has one big weight</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
     <button data-act="new">new data</button>
   </div>
   <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after the Hadamard rotation, with the energy per coordinate below each"></svg>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>Neither rotation is better in general; they are tools for different jobs. PCA also needs a rotation fitted to each layer's data, and stored. The Hadamard rotation needs neither, and it is the one that has the fast add-and-subtract form from step 4.</p>
+<p>Here is the same contrast in three dimensions, where you can watch it happen:</p>
+<ul>
+<li>Each dot is a group of three weights, red when its 2-bit rounding error is large and blue when it is small.</li>
+<li>There is no 3×3 Hadamard matrix (they exist for sizes 1, 2, 4, 8 and so on), so the flattening rotation is the 60° turn about the diagonal from the figure above, standing in for it.</li>
+<li>Choose a data set and a rotation, then drag the slider from 0 to 100% of that rotation.</li>
+</ul>
 
-<p><strong>Step 3: snap to a codebook made for bell curves.</strong> Because rotated groups all have roughly the same bell shape (once divided by their length), one set of levels can serve all of them. The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook. Each weight stores the 4-bit index of its nearest level. With 2 bits there are only 4 levels; Whistle mixes 2- and 4-bit layers.</p>
+<figure class="widget wide" data-widget="pca3d">
+  <figcaption><strong>PCA and a flattening rotation, in 3D.</strong> Gold dashed lines are the cloud's principal axes, the directions PCA turns into the coordinate axes. The readout gives the average rounding error and how the energy is divided among the three coordinates. Drag the background to look around.</figcaption>
+  <div class="sx-controls">
+    <span class="sx-seg"><button data-ds="axes" aria-pressed="true">spikes along the axes</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
+    <span class="sx-seg"><button data-rot="pca" aria-pressed="true">PCA rotation</button><button data-rot="diag" aria-pressed="false">flattening rotation</button></span>
+    <label>Rotate <input type="range" min="0" max="100" step="1" value="0" data-k="t"> <output data-o="t"></output></label>
+    <button data-act="new">new data</button>
+  </div>
+  <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="A cloud of points in three dimensions that rotates by PCA or by a flattening rotation, coloured by rounding error"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Neither rotation is better in general; they are tools for different jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so a PCA rotation can help or hurt by chance. When the weights move together (the second), PCA is exactly the wrong tool for rounding: it makes every group spikier.</p>
+
+<p><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
+<ul>
+<li>Rotated groups all have roughly the same bell shape (once divided by their length), so one set of levels can serve all of them.</li>
+<li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
+<li>Each weight stores the 4-bit index of its nearest level.</li>
+<li>With 2 bits there are only 4 levels. Whistle mixes 2- and 4-bit layers.</li>
+</ul>
 
 <figure class="widget wide" data-widget="cq">
   <figcaption><strong>Quantizing one group of 32 weights.</strong> Dots are the values to store, ticks the available levels, and lines show where each value rounds to. Turn rotation and the codebook off to compare with plain evenly spaced levels; the average over 500 random groups is the number to watch.</figcaption>
@@ -314,12 +412,29 @@
 <li>So at 4 bits most of the measured quality gain for SmolLM2 came from GPTQ (below), and the format's other strength is speed, which is step 4.</li>
 </ul>
 
-<p>Stored this way, a group of 64 weights takes 64 × 4 bits plus one 32-bit length: 4.5 bits per weight on average, because the one length is shared by all 64. SmolLM2 went from 538 MB to 76 MB, and Whistle is 16.9 MB.</p>
+<p>What it costs to store:</p>
+<ul>
+<li>A group of 64 weights takes 64 × 4 bits plus one 32-bit length, which is 4.5 bits per weight on average, because the one length is shared by all 64.</li>
+<li>SmolLM2 went from 538 MB to 76 MB.</li>
+<li>Whistle is 16.9 MB.</li>
+</ul>
 
-<p><strong>Step 4: never rebuild the weights.</strong> To use a weight you'd normally decode it: look up its level, multiply by the length, rotate back. Doing that for 135 million weights per word would be slow. Instead the kernel uses the fact that rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it. What a layer computes is the weights' dot product with the incoming numbers (the activations), and since the rotation is its own inverse:</p>
+<p><strong>Step 4: never rebuild the weights.</strong></p>
+<ul>
+<li>To use a weight you'd normally decode it: look up its level, multiply by the length, rotate back.</li>
+<li>Doing that for 135 million weights per word would be slow.</li>
+<li>Instead the kernel uses the fact that rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it.</li>
+</ul>
+<p>What a layer computes is the weights' dot product with the incoming numbers (the activations), and since the rotation is its own inverse:</p>
 <pre>  weights · activations  =  (rotated weights) · (rotated activations)
                          =  length × Σ codebook[index] × (rotated activations)</pre>
-<p>So the kernel rotates the <em>activations</em> once per group, and reuses them for every row of the matrix: thousands of rows share one rotation. The weights stay as indices. On the iPod's <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a> unit, one table-lookup instruction (<code>vtbl</code>) turns 8 indices into 8 small integer levels, and multiply-accumulate instructions sum 8 or 16 products at a time.</p>
+<p>So in practice:</p>
+<ul>
+<li>The kernel rotates the <em>activations</em> once per group and reuses them for every row of the matrix: thousands of rows share one rotation.</li>
+<li>The weights stay as indices.</li>
+<li>On the iPod's <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a> unit, one table-lookup instruction (<code>vtbl</code>) turns 8 indices into 8 small integer levels.</li>
+<li>Multiply-accumulate instructions then sum 8 or 16 products at a time.</li>
+</ul>
 
 <p>The rotation itself is cheap thanks to the <a href="https://en.wikipedia.org/wiki/Fast_Walsh%E2%80%93Hadamard_transform">fast Walsh–Hadamard transform</a>. Because the matrix is built by doubling, it can be applied in log₂ n rounds of add-and-subtract on pairs, the same <a href="https://en.wikipedia.org/wiki/Butterfly_diagram">butterfly</a> pattern as the FFT, with no multiplications:</p>
 
@@ -330,7 +445,13 @@
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>One more refinement is for SmolLM2 only. Rounding each weight to its nearest level is the simplest choice, but not the best one: the errors of neighbouring weights can add up or cancel out. <a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounds the weights one at a time and nudges the not-yet-rounded ones to compensate, using statistics of real activations (here, from 40 chat questions). It ran on the Mac in a minute, in the rotated domain, with one GPTQ block per group. <a href="https://en.wikipedia.org/wiki/Perplexity">Perplexity</a> on held-out chats, where lower is better:</p>
+<p>One more refinement is for SmolLM2 only:</p>
+<ul>
+<li>Rounding each weight to its nearest level is the simplest choice, but not the best one: the errors of neighbouring weights can add up or cancel out.</li>
+<li><a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounds the weights one at a time and nudges the not-yet-rounded ones to compensate, using statistics of real activations (here, from 40 chat questions).</li>
+<li>It ran on the Mac in a minute, in the rotated domain, with one GPTQ block per group.</li>
+</ul>
+<p><a href="https://en.wikipedia.org/wiki/Perplexity">Perplexity</a> on held-out chats, where lower is better:</p>
 
 <div class="wide"><table>
 <thead><tr><th>SmolLM2-135M stored as</th><th class="num">Size</th><th class="num">Perplexity</th></tr></thead>
@@ -343,9 +464,20 @@
 </tbody>
 </table></div>
 
-<p>The earlier pair, <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> (<a href="https://arxiv.org/abs/2410.15608">paper</a>, 30 MB) and the evenly spaced 4/8-bit SmolLM2 (98 MB), is still supported as a fallback. Whistle matched Moonshine's speed on the iPod with half the memory. On six questions asked by a real voice, Whistle got two right and Moonshine none.</p>
+<p>About the models and the daemon:</p>
+<ul>
+<li>The earlier pair, <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> (<a href="https://arxiv.org/abs/2410.15608">paper</a>, 30 MB) and the evenly spaced 4/8-bit SmolLM2 (98 MB), is still supported as a fallback.</li>
+<li>Whistle matched Moonshine's speed on the iPod with half the memory.</li>
+<li>On six questions asked by a real voice, Whistle got two right and Moonshine none.</li>
+</ul>
 
-<p>The daemon trims silence before speech recognition. Siri often keeps recording for seconds after you stop, and recognition time grows with audio length. It also skips Siri's end tone. It caches the system prompt and stops after two sentences, as Siri would.</p>
+<p>The daemon also does a few things to save time:</p>
+<ul>
+<li>It trims silence before speech recognition. Siri often keeps recording for seconds after you stop, and recognition time grows with audio length.</li>
+<li>It skips Siri's end tone.</li>
+<li>It caches the system prompt.</li>
+<li>It stops after two sentences, as Siri would.</li>
+</ul>
 </section>
 
 <section>
@@ -375,7 +507,7 @@
 
 <figure class="widget wide" data-widget="timeline">
   <figcaption><strong>From the end of speech to the full answer</strong>, for "What is the capital of France?" inside Siri.</figcaption>
-  <div class="sx-controls"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="now">Whistle + codebook LLM, locked in RAM</button><button data-v="alone">brain alone, warm</button></div>
+  <div class="sx-controls"><span class="sx-seg"><button data-v="before" aria-pressed="true">first version</button><button data-v="after">with prefetch and trimming</button><button data-v="now">Whistle + codebook LLM, locked in RAM</button><button data-v="alone">brain alone, warm</button></span></div>
   <div class="sx-tl"></div>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
@@ -403,6 +535,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
       </div>
     </article>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
-    <script src="assets/explainer.js?v=10" defer></script>
+    <script src="assets/explainer.js?v=12" defer></script>
   </body>
 </html>

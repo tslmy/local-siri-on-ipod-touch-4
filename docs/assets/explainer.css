@@ -50,7 +50,7 @@
   background: var(--bg); color: var(--text); border: 1px solid var(--sx-rule); border-radius: 999px;
 }
 .siri-explainer figure.widget button:hover { border-color: var(--accent); }
-.siri-explainer figure.widget button[aria-pressed=true] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
 .siri-explainer figure.widget input[type=range] { width: 12rem; max-width: 100%; accent-color: var(--accent); vertical-align: middle; }
 .siri-explainer .sx-controls { margin-bottom: .7rem; }
 .siri-explainer .sx-note { color: var(--muted); font-size: .85rem; margin-top: .6rem; min-height: 2.6em; }
@@ -189,3 +189,29 @@
 .sx-pc { width: 100%; height: auto; display: block; }
 .sx-pc .lbl { fill: var(--muted); font: 12px var(--sx-sans); }
 .sx-pc .pcb { fill: var(--sx-blue); }
+
+/* Toggles: on/off switches for independent options, segmented controls for pick-one groups */
+.siri-explainer figure.widget button[aria-pressed] {
+  position: relative; padding: .2rem .5rem .2rem 2.7rem; background: transparent; border: 0; border-radius: 6px; color: var(--text);
+}
+.siri-explainer figure.widget button[aria-pressed]:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.siri-explainer figure.widget button[aria-pressed]::before {
+  content: ''; position: absolute; left: .5rem; top: 50%; width: 1.7rem; height: .95rem; margin-top: -.475rem; border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent); transition: background .15s;
+}
+.siri-explainer figure.widget button[aria-pressed]::after {
+  content: ''; position: absolute; left: calc(.5rem + 2px); top: 50%; width: .75rem; height: .75rem; margin-top: -.375rem; border-radius: 50%;
+  background: var(--bg); transition: transform .15s;
+}
+.siri-explainer figure.widget button[aria-pressed=true]::before { background: var(--accent); }
+.siri-explainer figure.widget button[aria-pressed=true]::after { transform: translateX(.75rem); }
+.siri-explainer figure.widget button[aria-pressed]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.siri-explainer figure.widget .sx-seg { display: inline-flex; margin: 0 .7rem .3rem 0; border: 1px solid var(--sx-rule); border-radius: 6px; overflow: hidden; vertical-align: middle; flex-wrap: wrap; }
+.siri-explainer figure.widget .sx-seg button[aria-pressed] { margin: 0; padding: .25rem .7rem; border-radius: 0; background: transparent; }
+.siri-explainer figure.widget .sx-seg button[aria-pressed]::before, .siri-explainer figure.widget .sx-seg button[aria-pressed]::after { display: none; }
+.siri-explainer figure.widget .sx-seg button + button { border-left: 1px solid var(--sx-rule); }
+.siri-explainer figure.widget .sx-seg button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 16%, var(--bg)); font-weight: bold; }
+.siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed] { padding: .4rem .55rem; background: var(--bg); }
+.siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::before, .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::after { display: none; }
+.siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed=true] { background: color-mix(in srgb, var(--text) 14%, var(--bg)); }
+.sx-r3 .pax { stroke: var(--sx-gold); stroke-width: 1.5; stroke-dasharray: 5 4; }
