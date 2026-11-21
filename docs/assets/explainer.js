@@ -705,11 +705,12 @@
       const gs = SIZES[state.g], ng = C / gs, st = stats(gs); cur = st; curGs = gs;
       $(fig, '[data-o=g]').textContent = `${ng} of ${gs}`;
       let gm = 0; for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) gm = Math.max(gm, Math.abs(val(r, c)));
-      const cells = (svg, h, color) => {
+      const cells = (svg, h, color, labels) => {
         const kids = [];
         for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(mk('rect', { x: c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
-        for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: 0, y2: R * RH, class: 'gl' }));
+        for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH + 1.5, y2: (r + 1) * RH - 1.5, class: 'gl' }));   // each row has its own boundaries
         if (state.out) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outl[r][c]) kids.push(mk('rect', { x: c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
+        if (labels) for (let r = 0; r < R; r++) st.scales[r].forEach((sc, g) => { const t = mk('text', { x: (g + .5) * gs * CW, y: r * RH + RH * .5, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gv' }); t.textContent = sc.mx.toFixed(1); kids.push(t); });   // each group's scale, on its cells
         kids.push(mk('rect', { x: 1, y: state.sel * RH + 1, width: C * CW - 2, height: RH - 2, class: 'sel' }));
         return kids;
       };
@@ -721,7 +722,7 @@
         bars.push(mk('rect', { x: x0, y: R * RH + 4 + BARH - h, width: bw, height: h, class: s.mx > 3 ? 'big' : 'sc' }));
         if (bw >= 24) { const t = mk('text', { x: x0 + bw / 2, y: R * RH + 4 + BARH - h - 3, 'text-anchor': 'middle', class: 'lbl' }); t.textContent = s.mx.toFixed(1); bars.push(t); }
       });
-      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH + BARH + 6}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol), ...bars);
+      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH + BARH + 6}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol, true), ...bars);
       esvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); esvg.replaceChildren(...cells(esvg, R * RH, ecol));
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;

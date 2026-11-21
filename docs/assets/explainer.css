@@ -145,7 +145,8 @@
 
 /* Figure 9: why weights are grouped */
 .sx-gr { width: 100%; height: auto; display: block; cursor: pointer; }
-.sx-gr .gl { stroke: var(--text); stroke-width: 1.5; }
+.sx-gr .gl { stroke: #fff; stroke-width: 1.5; }
+.sx-gr .gv { fill: #fff; stroke: rgba(0, 0, 0, .6); stroke-width: 2px; paint-order: stroke; font: 7px var(--sx-sans); pointer-events: none; }
 .sx-gr .sel { fill: none; stroke: var(--text); stroke-width: 2; }
 .sx-gr .sc { fill: var(--sx-blue); }
 .sx-gr .big { fill: var(--sx-gold); }
