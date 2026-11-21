@@ -339,6 +339,10 @@
       });
       const [qx, qy] = proj(q); kids.push(mk('circle', { cx: qx, cy: qy, r: 3.5, class: 'qpt' }));
       svg.replaceChildren(...kids);
+      const M = [0, 1, 2].map((i) => [0, 1, 2].map((j) => rotate([0, 1, 2].map((k) => +(k === j)), state.deg)[i])), box = $(fig, '.sx-mat'), tb = el('table');
+      M.forEach((row) => { const tr = el('tr'); row.forEach((v) => { const td = el('td', 'num', (v < 0 ? '−' : '') + Math.abs(v).toFixed(2)); td.style.background = `color-mix(in srgb, var(--sx-gold) ${Math.abs(v) * 70}%, transparent)`; tr.append(td); }); tb.append(tr); });
+      const big = Math.max(...M.flat().map(Math.abs)), cap = el('p', 'sx-note', `Rotation matrix now: largest entry ${big.toFixed(2)}${Math.abs(big - 2 / 3) < .005 && state.deg === 60 ? ', the smallest any 3×3 rotation can reach' : ''}. For comparison, every entry of the 64×64 Hadamard matrix has size 0.125 (1/8).`);
+      box.replaceChildren(tb, cap);
       const errs = (d) => base.map((p) => quant(rotate(p, d)).err), avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
       note.textContent = `Rotated ${state.deg}°. Point ${NAMES[state.sel]}: (${sel.map((x) => x.toFixed(2)).join(', ')}). Its largest coordinate is ${(m * 100).toFixed(0)}% of its length, so its rounding error is ${(err * 100).toFixed(0)}%. `
         + `Average over the four points: ${(avg(errs(state.deg)) * 100).toFixed(0)}% (${(avg(errs(0)) * 100).toFixed(0)}% before rotating).`;
