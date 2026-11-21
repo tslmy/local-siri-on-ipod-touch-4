@@ -346,6 +346,7 @@
     const had = fig.hasAttribute('data-had'), layers = (fig.dataset.layers || 'points').split(/\s+/), has = (l) => layers.includes(l);
     const sc = scenes[fig.dataset.scene || 'main'] || (scenes[fig.dataset.scene || 'main'] = { st: { sp: 100, n: 3, at: 'axes', mode: 'plain', seed: 4 }, base: [], subs: [] });
     if (!sc.base.length) genScene(sc);
+    if (fig.dataset.levels) sc.st.mode = fig.dataset.levels;      // a figure can fix the levels option: "fixed" is step 3's one shared grid
     const rot = { deg: 0, sel: 0, follow: false };      // per figure: only the rotation figures turn the groups
     const CX = 165, CY = 150, S = 100, FLAT = Math.SQRT1_2;   // the fixed grid is sized for a perfectly flat group: both coordinates 0.71
     const svg = $(fig, 'svg.sx-r2'), note = $(fig, '.sx-readout');

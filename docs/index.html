@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=44" />
+    <link rel="stylesheet" href="assets/explainer.css?v=45" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -558,6 +558,35 @@ Here are the entries of these matrices, before the scaling:</p>
 <li>With 2 bits there are only 4 levels. Whistle mixes 2- and 4-bit layers.</li>
 </ul>
 
+<p>Here is that idea on the two-weight groups from step 2. The length of each group is divided out, so the dots sit on a circle of length 1, and one grid is shared by every group:</p>
+
+<figure class="widget wide" data-widget="rot2d" data-scene="step3" data-layers="strips points quant ghost curve" data-levels="fixed">
+  <figcaption><strong>One fixed grid for every group.</strong> A group's scale is now its length, and its weights are what is left after dividing it out. The gold square is the one grid all groups share. It is sized here for a perfectly flat group, with both weights 0.71, while Whistle's grid is Gaussian-shaped and built for groups of 64. Make up some groups, then rotate them and watch the arrows shrink as the groups get flatter:</figcaption>
+  <div class="sx-rowlabel sx-block">Mock groups</div>
+  <div class="sx-opts">
+    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one.</span></button>
+    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size.</span></button>
+  </div>
+  <div class="sx-controls">
+    <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
+    <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <button data-act="new">new points</button>
+  </div>
+  <div class="sx-trip">
+    <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups with the length divided out, with each group's length printed on it"></svg><p class="sx-hint">Weights with the length divided out, and each group's length (its scale) printed on it</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the length of each group"></svg><p class="sx-hint">Scale of each group, its length (the more gold, the larger)</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="te" role="img" aria-label="Heatmap of the rounding error of each weight"></svg><p class="sx-hint">Rounding error, in units of the group's length (the redder, the larger)</p></div>
+  </div>
+  <div class="sx-rowlabel sx-block">Rotation</div>
+  <div class="sx-controls">
+    <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
+    <button data-act="reset">reset</button>
+    <button data-act="follow" aria-pressed="false">camera follows the points</button>
+  </div>
+  <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Groups on a circle of length 1 with one shared grid of quantization levels, arrows to the grid points, and a curve of average spikiness against rotation angle"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
 <figure class="widget wide" data-widget="cq">
   <figcaption><strong>Quantizing one group of 32 weights.</strong> Dots are the values to store, ticks the available levels, and lines show where each value rounds to. Turn rotation and the codebook off to compare with plain evenly spaced levels; the average over 500 random groups is the number to watch.</figcaption>
   <div class="sx-controls">
@@ -703,6 +732,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=46" defer></script>
+    <script src="assets/explainer.js?v=47" defer></script>
   </body>
 </html>
