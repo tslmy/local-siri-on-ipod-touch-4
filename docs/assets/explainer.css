@@ -321,3 +321,16 @@
 .toc-float a[aria-current] { color: var(--accent); border-left-color: var(--accent); font-weight: bold; }
 html { scroll-behavior: smooth; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* Groups of three weights (the 3D detour) */
+.sx-r3g .ghost { fill: none; stroke-dasharray: 2.5 2.5; pointer-events: none; }
+.sx-r3g .dest { fill: none; pointer-events: none; }
+.sx-r3g .cube3 { fill: none; }
+.sx-r3g .gnum { font-weight: bold; font-size: 10px; pointer-events: none; }
+.sx-r3g .axl { font-style: italic; fill: var(--text); }
+.sx-r3g .arrh { stroke: none; }
+.sx-r3g .crv { fill: none; stroke-width: 2; }
+.sx-r3g .cur { stroke: var(--muted); stroke-width: 1; }
+.sx-r3g .cdot { stroke: none; }
+.sx-r3g .hadl { stroke: var(--sx-gold); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.sx-r3g .lbl { fill: var(--muted); font: 11px var(--sx-sans); }

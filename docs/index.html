@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=55" />
+    <link rel="stylesheet" href="assets/explainer.css?v=56" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -402,36 +402,7 @@
 </ul>
 </details>
 
-<p>With three weights, the same picture is a point in 3D space, one weight per axis:</p>
-<ul>
-<li>The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate.</li>
-<li>A point close to an axis has one big weight and two tiny ones. Its cube must be as large as the point is long, so the grid is coarse.</li>
-<li>Rotating the point is the same as writing it against rotated axes. The same point, with the same length, now has no dominant coordinate: the cube shrinks, the grid gets finer, and the rounding error drops.</li>
-</ul>
-<p>Things to try in the figure:</p>
-<ul>
-<li>Click a point to see its grid.</li>
-<li>Drag the background to look around, or switch on "spin the view" and move the slider while the points turn. It is much easier to see how they move in space.</li>
-<li>Turn the slider. At 60° the points are flattest, and at 120° they are spiky again.</li>
-<li>Flip the camera switch. Off, the camera stays with the axes and the points move. On, it stays with the points, and the axes and the cube turn the other way. It is the same picture seen from two places.</li>
-</ul>
-
-<figure class="widget wide" data-widget="rot3d">
-  <figcaption><strong>Rotating four groups of three weights.</strong> Each dot is one group, a point on a sphere of length 1. The cube is the range its levels must cover, with 4 levels per axis (2 bits), and the gold line goes from the point to the level it rounds to. Rotating about the diagonal by 60° turns every axis-aligned spike into a flatter point; at 120° the points are spiky again.</figcaption>
-  <div class="sx-controls">
-    <label>Rotate <input type="range" min="0" max="120" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
-    <button data-act="flat">60° (flattest 3×3)</button>
-    <button data-act="reset">reset</button>
-    <button data-act="follow" aria-pressed="false">camera follows the points</button>
-    <button data-act="spin" aria-pressed="false">spin the view</button>
-  </div>
-  <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="Four points in three dimensions with the cube of quantization levels around the selected point"></svg>
-  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
-  <div class="sx-mat"></div>
-  <p class="sx-note">The slider is only an animation: in practice a rotation is applied once, all at once. At 60° the rotation matrix has the flattest entries a 3×3 rotation can have, ±2/3 and ±1/3.</p>
-</figure>
-
-<p>Why this is safe:</p>
+<p>Before we pick a rotation, here is why rotating the groups is safe at all:</p>
 <ul>
 <li><strong>Nothing is lost.</strong> A rotation keeps every point's length and can be undone exactly by rotating back, so the rounding error is the same size whichever side you measure it on.</li>
 <li><strong>It costs no bits.</strong> There is nothing extra to store.</li>
@@ -465,7 +436,7 @@
 <p>Here is the same contrast in three dimensions, where you can watch it happen:</p>
 <ul>
 <li>Each dot is a group of three weights, red when its 2-bit rounding error is large and blue when it is small.</li>
-<li>The flattening rotation is the 60° turn about the diagonal from the figure above.</li>
+<li>The flattening rotation is a 60° turn about the diagonal direction (1, 1, 1), the flattest rotation of three weights (the detour on three weights at the end of this step shows it).</li>
 <li>Choose a data set and a rotation, then drag the slider from 0 to 100% of that rotation. "Spin the view" turns the camera so you can see the cloud from all sides.</li>
 </ul>
 
@@ -480,16 +451,16 @@
   </div>
   <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="A cloud of points in three dimensions that rotates by PCA or by a flattening rotation, coloured by rounding error"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
-  <p class="sx-note">The slider is only an animation. A real PCA step applies one matrix, fitted to the data, all at once. The flattening rotation is the 60° one from the figure above.</p>
+  <p class="sx-note">The slider is only an animation. A real PCA step applies one matrix, fitted to the data, all at once. The flattening rotation is the 60° turn about (1, 1, 1).</p>
 </figure>
 
 <p>Neither rotation is better in general; they are tools for different jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so a PCA rotation can help or hurt by chance. When the weights move together (the second), PCA is exactly the wrong tool for rounding: it makes every group spikier.</p>
 
 </details>
 
-<p><strong>Which rotation?</strong> Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
+<p><strong>Which rotation?</strong> Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. Our groups so far have had two weights, but Whistle's have 64 or 128, so we need such a matrix for bigger groups too. It is a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
 \[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
-Each bigger one is four copies of the previous one, with the bottom-right copy negated:
+Each bigger one is four copies of the previous one, with the bottom-right copy negated. That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up to 64 and 128:
 \[ H_{2n} = \frac{1}{\sqrt{2}}\begin{bmatrix} H_n & H_n \\ H_n & -H_n \end{bmatrix} \]
 Here are the entries of these matrices, before the scaling:</p>
 
@@ -529,7 +500,7 @@ Here are the entries of these matrices, before the scaling:</p>
 <thead><tr><th>Weights in the group</th><th class="num">Largest coordinate after rotating a lone spike</th></tr></thead>
 <tbody>
 <tr><td>1 (nothing to spread over)</td><td class="num">100% of the length</td></tr>
-<tr><td>3 (the 3D figure reaches about two thirds for all three axes at once)</td><td class="num">at best 58%</td></tr>
+<tr><td>3 (no Hadamard matrix exists for this size; see the detour on three weights)</td><td class="num">at best 58%</td></tr>
 <tr><td>8</td><td class="num">35%</td></tr>
 <tr><td>64</td><td class="num">12.5% (1/8)</td></tr>
 <tr><td>128</td><td class="num">8.8%</td></tr>
@@ -537,8 +508,8 @@ Here are the entries of these matrices, before the scaling:</p>
 </table></div>
 <p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the 2D picture shows when it helps. This is the same figure as before, with that angle marked:</p>
 
-<figure class="widget wide" data-widget="rot2d" data-scene="had" data-layers="points quant ghost curve" data-had="1">
-  <figcaption><strong>The Hadamard angle.</strong> The same two kinds of group as before, now with the Hadamard matrix marked on the curves and shown next to the rotation matrix. Rotate:</figcaption>
+<figure class="widget wide" data-widget="rot2d" data-scene="had" data-groups="clusters" data-layers="points quant ghost curve" data-had="1">
+  <figcaption><strong>The Hadamard angle.</strong> Two kinds of group, as before, but now arranged symmetrically: the spiky groups (triangles) are spread evenly on both sides of an axis, and the flat groups (circles) on both sides of a diagonal. That way the Hadamard matrix, marked on the curves and shown next to the rotation matrix, sits exactly at the bottom of the spiky curve. Rotate:</figcaption>
   <div class="sx-rowlabel sx-block">Groups</div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
@@ -557,8 +528,8 @@ Here are the entries of these matrices, before the scaling:</p>
   <div class="callout">
     <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and the two curves show which:
     <ul>
-    <li><strong>Spiky groups, the triangles (first half).</strong> They start near an axis, as far from 45° as possible, so turning by 45° brings them to the flat direction. The gold curve is lowest at 45°.</li>
-    <li><strong>Flat groups, the circles (second half).</strong> They start near a diagonal, so they are already flat, and 45° turns them into spikes. The blue curve peaks at 45°.</li>
+    <li><strong>Spiky groups, the triangles.</strong> They start near an axis, as far from 45° as possible, so turning by 45° brings them to the flat direction. The gold curve is lowest at 45°.</li>
+    <li><strong>Flat groups, the circles.</strong> They start near a diagonal, so they are already flat, and 45° turns them into spikes. The blue curve peaks at 45°.</li>
     </ul>
     With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
   </div>
@@ -570,12 +541,60 @@ Here are the entries of these matrices, before the scaling:</p>
 <thead><tr><th>Group size \(n\)</th><th class="num">Smallest largest entry</th><th>Which matrix gets there</th></tr></thead>
 <tbody>
 <tr><td>2</td><td class="num">0.71</td><td>The Hadamard matrix, exactly: the 45° rotation above</td></tr>
-<tr><td>3</td><td class="num">0.67</td><td>No Hadamard matrix of this size exists. The 60° rotation from the 3D figure is the flattest we found (a numerical search agrees)</td></tr>
+<tr><td>3</td><td class="num">0.67</td><td>No Hadamard matrix of this size exists. The 60° rotation in the detour on three weights is the flattest we found (a numerical search agrees)</td></tr>
 <tr><td>4</td><td class="num">0.5</td><td>The 4×4 Hadamard matrix</td></tr>
 <tr><td>8</td><td class="num">0.35</td><td>The 8×8 Hadamard matrix</td></tr>
 <tr><td>64</td><td class="num">0.125</td><td>The 64×64 Hadamard matrix, which is why groups of 64 (or 128) are a natural size</td></tr>
 </tbody>
 </table></div>
+
+<details class="detour">
+<summary>Detour: what about the 3D case (3 weights per group)?</summary>
+
+<p>Everything so far used groups of two weights, and Whistle's groups have 64 or 128. Three weights is the case in between that you can still draw. It comes with a catch: <strong>a Hadamard matrix can't be built for three weights.</strong> The doubling rule only makes sizes 2, 4, 8, 16 and so on, and in general a matrix of +1 and −1 entries with perpendicular rows exists only for sizes 1, 2 and multiples of 4. So for three weights we use the flattest rotation we know instead: a turn about the diagonal direction \((1, 1, 1)\), which is best at 60°.</p>
+
+<p>Here are some groups of three weights, laid out like the two-weight ones. They run from a short group where one weight dominates to a long group where all three weights are equal:</p>
+
+<figure class="widget wide" data-widget="rot3dg" data-scene="three" data-layers="strips">
+  <figcaption><strong>Groups of three weights.</strong> Each group has a number and a color. The first half, where one weight dominates, are spiky (triangles). The second half, where the weights are alike, are flat (circles).</figcaption>
+  <div class="sx-rowlabel sx-block">Groups</div>
+  <div class="sx-controls">
+    <label>Number of groups <input type="range" min="2" max="8" step="2" value="4" data-k="n"> <output data-o="n"></output></label>
+  </div>
+  <div class="sx-trip">
+    <div class="sx-tcol"><svg class="sx-gr" data-v="tw" role="img" aria-label="The weights of the groups as a row of cells, with each group's scale printed on it"></svg><p class="sx-hint">Weights, with each group's scale printed on it</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="ts" role="img" aria-label="Heatmap of the scale of each group"></svg><p class="sx-hint">Scale of each group, its largest weight (the more gold, the larger)</p></div>
+    <div class="sx-tcol"><svg class="sx-gr" data-v="te" role="img" aria-label="Heatmap of the rounding error of each weight"></svg><p class="sx-hint">Rounding error, after rounding each weight to one of 4 levels (the redder, the larger)</p></div>
+  </div>
+</figure>
+
+<p>Three weights make a point in 3D space, one weight per axis. Each group gets a cube of levels, 4 per axis, that just reaches its largest weight. Here is the same setup as for two weights, with the groups rotated about the diagonal:</p>
+
+<figure class="widget wide" data-widget="rot3dg" data-scene="three" data-layers="points quant ghost curve loss" data-toggles="cubes:Cubes;grid:Grid points;pre:Pre-rotation locations;start:Rotated locations (start);end:Stored locations (end);trail:Arrows">
+  <figcaption><strong>Rotating groups of three weights.</strong> Dashed outlines mark where the groups started, filled markers are where the rotation has taken them, and solid outlines are where each group is stored. Drag the background to look around, click a marker to select a group, or switch on "spin the view" and move the slider while everything turns.</figcaption>
+  <div class="sx-rowlabel sx-block">Rotation</div>
+  <div class="sx-controls">
+    <label>Angle <input type="range" min="0" max="120" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
+    <button data-act="flat">60° (flattest)</button>
+    <button data-act="reset">reset</button>
+    <button data-act="follow" aria-pressed="false">camera follows the points</button>
+    <button data-act="spin" aria-pressed="false">spin the view</button>
+  </div>
+  <svg class="sx-r3 sx-r3g" viewBox="0 0 640 330" role="img" aria-label="Groups of three weights as points in three dimensions with a cube of quantization levels around each, rotated about the diagonal, and a curve of average spikiness against rotation angle"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+  <div class="sx-mat"></div>
+  <p class="sx-cap2">And here is how much each group loses to rounding at the current angle, split into the first half (spiky) and the second half (flat):</p>
+  <svg class="sx-ol" data-v="loss" viewBox="0 0 640 200" role="img" aria-label="Rounding error of each group at the current angle, split into the first half and the second half"></svg>
+  <p class="sx-note" data-v="lossnote" aria-live="polite">&nbsp;</p>
+  <p class="sx-note">The slider is only an animation: in practice a rotation is applied once, all at once.</p>
+</figure>
+
+<p>Two things differ from the two-weight picture:</p>
+<ul>
+<li>The flat groups sit on the diagonal that the rotation turns about, so they hardly move, and the rotation does not hurt them here the way it did in 2D.</li>
+<li>At 60° the rotation matrix has entries of ±2/3 and ±1/3, which is as flat as any 3×3 rotation can be. That flattens a lone spike to two thirds of its length, a smaller gain than for bigger groups, where a Hadamard matrix takes it down to \(1/\sqrt{n}\).</li>
+</ul>
+</details>
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 <ul>
@@ -753,6 +772,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=65" defer></script>
+    <script src="assets/explainer.js?v=69" defer></script>
   </body>
 </html>
