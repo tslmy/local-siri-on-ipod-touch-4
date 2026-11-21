@@ -322,6 +322,7 @@
       kids.push(mk('rect', { x: X(-m), y: Y(m), width: 2 * m * S, height: 2 * m * S, class: 'sq' }));
       for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) kids.push(mk('circle', { cx: X(-m + a * 2 * m / 3), cy: Y(-m + b * 2 * m / 3), r: 2, class: 'gd' }));
       kids.push(line(X(sel[0]), Y(sel[1]), X(q[0]), Y(q[1]), 'snap3'));
+      pts.forEach((p) => kids.push(mk('circle', { cx: X(p[0]), cy: Y(p[1]), r: 4, class: 'ghost' })));   // where the groups started
       P.forEach((p, i) => kids.push(mk('circle', { cx: X(p[0]), cy: Y(p[1]), r: 5.5, class: 'pt' + (i === state.sel ? ' sel' : ''), 'data-i': i })));
       kids.push(mk('circle', { cx: X(q[0]), cy: Y(q[1]), r: 3.5, class: 'qpt' }));
       // error against angle, with the Hadamard angle marked

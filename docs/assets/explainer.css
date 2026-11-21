@@ -258,3 +258,4 @@
 .siri-explainer figure.widget .sx-cap2 { color: var(--muted); margin: .9rem 0 .7rem; }
 .siri-explainer figure.widget .callout { margin-top: 1rem; }
 .siri-explainer figure.widget .callout ul { margin: .5rem 0; padding-left: 1.2rem; }
+.sx-r2 .ghost { fill: none; stroke: var(--muted); stroke-width: 1; opacity: .7; pointer-events: none; }
