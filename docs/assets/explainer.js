@@ -930,6 +930,31 @@
 
   const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, rot2d: rot2dFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
+  // A contents column that floats on the left of wide windows: every numbered section, the 4-bit section's steps, and a highlight on the one being read
+  (() => {
+    const heads = [...document.querySelectorAll('.siri-explainer h2[id]:not(#contents), .siri-explainer h3[id], .siri-explainer [data-toc]')];
+    if (!heads.length) return;
+    const nav = el('nav', 'toc-float'); nav.setAttribute('aria-label', 'Contents'); nav.append(el('p', 'toc-title', 'Contents'));
+    const ul = el('ul'), links = [];
+    heads.forEach((h) => {
+      const sub = h.tagName !== 'H2', li = el('li', sub ? 'sub' : ''), a = el('a', null, h.dataset.toc || h.textContent.trim());
+      a.href = '#' + h.id; li.append(a); ul.append(li); links.push([h, a]);
+    });
+    nav.append(ul); document.body.append(nav);
+    let active = null, ticking = false;
+    const update = () => {
+      ticking = false; let cur = links[0];
+      for (const l of links) { if (l[0].getBoundingClientRect().top <= innerHeight * .3) cur = l; else break; }
+      if (cur === active) return;
+      if (active) active[1].removeAttribute('aria-current');
+      active = cur; cur[1].setAttribute('aria-current', 'true');
+      const r = cur[1].getBoundingClientRect(), n = nav.getBoundingClientRect();
+      if (r.top < n.top + 40 || r.bottom > n.bottom - 20) nav.scrollTop += r.top - n.top - n.height / 2;     // keep the current entry in view when the column itself scrolls
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener('resize', update); update();
+  })();
+
   // LaTeX in the text: \( inline \) and \[ display \], rendered by KaTeX when it has loaded (the raw LaTeX stays readable if it hasn't)
   window.addEventListener('load', () => {
     if (window.renderMathInElement) renderMathInElement(document.body, { delimiters: [{ left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }], throwOnError: false });

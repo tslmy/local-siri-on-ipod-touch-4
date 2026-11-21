@@ -304,3 +304,20 @@
 .sx-ol .gnum { font-weight: bold; font-size: 10px; pointer-events: none; }
 .sx-r2 .crv { stroke-width: 2; }
 .sx-r2 .arc { fill: none; stroke-linecap: round; }
+
+/* A floating contents column on the left, when the window is wide enough to leave room beside the text */
+.toc-float { display: none; }
+@media (min-width: 1340px) {
+  .toc-float { display: block; position: fixed; top: 4.5rem; left: max(.75rem, calc((100vw - 55rem) / 2 - 15.25rem)); width: 13.75rem; max-height: calc(100vh - 6.5rem); overflow-y: auto; font: .78rem/1.35 var(--sx-sans, system-ui, sans-serif); }
+  .siri-explainer .toc { display: none; }
+}
+.toc-float .toc-title { margin: 0 0 .5rem; font-weight: bold; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-size: .72rem; }
+.toc-float ul { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--sx-rule, rgba(128, 128, 128, .35)); }
+.toc-float li { margin: 0; }
+.toc-float li.sub { padding-left: .8rem; }
+.toc-float a { display: block; padding: .22rem .6rem; color: var(--muted); text-decoration: none; border-left: 2px solid transparent; margin-left: -1px; }
+.toc-float li.sub a { font-size: .74rem; }
+.toc-float a:hover { color: var(--text); }
+.toc-float a[aria-current] { color: var(--accent); border-left-color: var(--accent); font-weight: bold; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
