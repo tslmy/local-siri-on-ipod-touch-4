@@ -660,14 +660,26 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <p>The arithmetic is short. Take groups of \(G\) weights, \(b\)-bit indices, and \(c\)-bit numbers (\(c = 32\) here). Anything stored once for the whole model is negligible, so what counts is what is stored for every group:</p>
 \[ \begin{aligned} \text{shared codebook:}\quad & b + \frac{c}{G} \\ \text{fresh codebook per group:}\quad & b + \frac{2^b\,c}{G} \end{aligned} \]
 
-<figure class="widget wide" data-widget="codebooks">
-  <figcaption><strong>What is stored for each group.</strong> Four groups of each scheme, with every bar as long as the bits it takes. Make the groups larger and the fresh codebook's share shrinks, as the formula says.</figcaption>
-  <div class="sx-controls">
-    <label>Weights per group <input type="range" min="0" max="4" step="1" value="2" data-k="g"> <output data-o="g"></output></label>
-  </div>
-  <svg class="sx-sz" viewBox="0 0 640 210" role="img" aria-label="Rows of groups showing the bits stored for each: indices and a scale with one shared codebook, and indices and a codebook with a fresh codebook per group"></svg>
-  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+<figure class="widget wide">
+  <figcaption><strong>What is stored for one group of 64 weights.</strong> The same three kinds of data, drawn in proportion: the indices (blue), the group's scale (gold) and a codebook of 16 levels (red).</figcaption>
+  <svg class="sx-sz" viewBox="0 0 640 200" role="img" aria-label="Two stacked bars, drawn to scale, of what is stored for one group of 64 weights: with a shared codebook, 256 bits of indices and a 32-bit scale; with a fresh codebook, 256 bits of indices and 512 bits of codebook">
+  <text x="10.0" y="18" text-anchor="start" class="lbl" style="fill:var(--text);font-weight:bold;">Shared codebook: 288 bits per group, 4.5 bits per weight</text>
+  <rect x="10" y="34" width="184.3" height="36" style="fill:var(--sx-blue)"/>
+  <rect x="194.3" y="34" width="23.0" height="36" style="fill:var(--sx-gold)"/>
+  <rect x="231.4" y="34" width="368.6" height="36" style="fill:none;stroke:var(--sx-red);stroke-width:2;stroke-dasharray:5 4"/>
+  <text x="16.0" y="56" text-anchor="start" class="lbl" style="fill:#1a1a1a;">indices: 64 × 4 = 256 bits</text>
+  <text x="205.8" y="85" text-anchor="middle" class="lbl" style="fill:var(--text);">scale: 32 bits</text>
+  <text x="415.7" y="56" text-anchor="middle" class="lbl" style="fill:var(--text);">codebook: 16 × 32 = 512 bits, stored once</text>
+  <text x="415.7" y="85" text-anchor="middle" class="lbl" style="fill:var(--text);">for the whole model, not per group</text>
+  <text x="10.0" y="116" text-anchor="start" class="lbl" style="fill:var(--text);font-weight:bold;">Fresh codebook per group: 768 bits per group, 12 bits per weight</text>
+  <rect x="10" y="132" width="184.3" height="36" style="fill:var(--sx-blue)"/>
+  <rect x="194.3" y="132" width="368.6" height="36" style="fill:var(--sx-red)"/>
+  <text x="16.0" y="154" text-anchor="start" class="lbl" style="fill:#1a1a1a;">indices: 64 × 4 = 256 bits</text>
+  <text x="378.6" y="154" text-anchor="middle" class="lbl" style="fill:#1a1a1a;">its own codebook: 16 × 32 = 512 bits</text>
+  <text x="10.0" y="190" text-anchor="start" class="lbl" style="fill:var(--text);">Both bars are drawn to the same scale. The fresh codebook replaces the scale.</text>
+</svg>
 </figure>
+
 
 <ul>
 <li>The shared scheme pays for one scale per group. The fresh scheme pays for \(2^b\) levels per group instead, which is \(2^b\) times as much: with \(b = 4\), sixteen times.</li>
@@ -959,6 +971,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=99" defer></script>
+    <script src="assets/explainer.js?v=101" defer></script>
   </body>
 </html>

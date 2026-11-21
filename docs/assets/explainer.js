@@ -1174,36 +1174,6 @@
     fig.querySelectorAll('input').forEach((i) => i.addEventListener('input', draw)); draw();
   };
 
-  // 11b. What is stored per group with one shared codebook, and with a fresh codebook for every group
-  const codebooksFig = (fig) => {
-    const svg = $(fig, 'svg'), note = $(fig, '.sx-readout'), SIZES = [16, 32, 64, 128, 256], B = 4, C = 32, L = 2 ** B;
-    const draw = () => {
-      const G = SIZES[+$(fig, '[data-k=g]').value]; $(fig, '[data-o=g]').textContent = G;
-      const idx = G * B, fresh = L * C, k = 468 / (4 * (idx + fresh)), kids = [];
-      const txt = (x, y, t, a, c) => { const e = sv('text', { x, y, 'text-anchor': a || 'start', class: c || 'lbl' }); e.textContent = t; return e; };
-      const BLUE = 'var(--sx-blue)', GOLD = 'var(--sx-gold)', RED = 'var(--sx-red)';
-      const seg = (x, y, w, color) => sv('rect', { x, y, width: Math.max(1.5, w), height: 34 }, `fill:${color}`);
-      const row = (y, title, parts, shared) => {
-        kids.push(txt(10, y, title, 'start', 'lbl rowname'));
-        const by = y + 24, rail = by - 10, wire = (x1, y1, x2, y2) => sv('line', { x1, y1, x2, y2 }, 'stroke:var(--muted);stroke-width:1.2'); let x = 120, last = 0;
-        if (shared) kids.push(sv('rect', { x: 10, y: by, width: 86, height: 34, rx: 3 }, `fill:none;stroke:${RED};stroke-width:2`), txt(53, by + 15, 'codebook', 'middle'), txt(53, by + 28, `${L} × ${C} bits`, 'middle'), txt(53, by + 50, 'stored once', 'middle'), wire(53, by, 53, rail));
-        for (let g = 0; g < 4; g++) {
-          const x0 = x; parts.forEach(([bits, color]) => { kids.push(seg(x, by, bits * k, color)); x += bits * k; });
-          last = x0 + (x - x0) / 2; if (shared) kids.push(wire(last, rail, last, by));
-          x += 14;
-        }
-        if (shared) kids.push(wire(53, rail, last, rail));
-        kids.push(txt(x - 4, by + 21, '…', 'start'));
-      };
-      row(14, `Shared codebook: ${(B + C / G).toFixed(2)} bits per weight`, [[idx, BLUE], [C, GOLD]], true);
-      row(112, `Fresh codebook per group: ${(B + fresh / G).toFixed(2)} bits per weight`, [[idx, BLUE], [fresh, RED]], false);
-      [[BLUE, `indices: ${G} × ${B} = ${idx} bits`, 10], [GOLD, `scale: ${C} bits`, 215], [RED, `a codebook: ${L} × ${C} = ${fresh} bits`, 330]].forEach(([c, t, x]) => kids.push(sv('rect', { x, y: 192, width: 10, height: 10 }, `fill:${c}`), txt(x + 15, 201, t)));
-      svg.replaceChildren(...kids);
-      note.textContent = `Per group of ${G}: ${idx + C} bits with the shared codebook, ${idx + fresh} bits with a fresh one (in place of the scale), which is ${((idx + fresh) / (idx + C)).toFixed(1)} times as much. Bar lengths are drawn to the same scale.`;
-    };
-    $(fig, '[data-k=g]').addEventListener('input', draw); draw();
-  };
-
   // 12. Why the kernel rotates the activations: the identity with real numbers, and the operation count
   const reuseFig = (fig) => {
     const N = 8, box = $(fig, '.sx-reuse'), svg = $(fig, 'svg'), note = $(fig, '.sx-readout'); let seed = 5, w = [], x = [];
@@ -1228,7 +1198,7 @@
     gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, groupingrot: groupingRotFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, codebooks: codebooksFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, groupingrot: groupingRotFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // Cross-references: a link with class "xref" scrolls to its target and raises a floating button that carries the reader back to the link
   (() => {
