@@ -3,6 +3,12 @@
 (() => {
   const $ = (root, sel) => root.querySelector(sel);
   const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  // Text with \( inline LaTeX \) for generated readouts: the maths is typeset by KaTeX (loaded before this script), the rest is escaped
+  const esc = (t) => t.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const tex = (m) => (window.katex ? window.katex.renderToString(m, { throwOnError: false }) : esc(m));
+  const mathText = (str) => str.split(/(\\\(.*?\\\))/).map((part) => (part.startsWith('\\(') && part.endsWith('\\)') ? tex(part.slice(2, -2)) : esc(part))).join('');
+  const setMath = (e, str) => { e.innerHTML = mathText(str); return e; };
+  const mel = (tag, cls, str) => setMath(el(tag, cls), str);
   const press = (buttons, on) => buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === on)));
 
   // Jacobi rotations for a small symmetric matrix: eigenvectors (biggest eigenvalue first) and eigenvalues
@@ -218,16 +224,16 @@
         c.addEventListener('click', () => {
           grid.classList.add('picked');
           grid.querySelectorAll('div').forEach((d) => d.classList.toggle('sel', d.dataset.row === String(i)));
-          const terms = row.map((x, k) => `${x > 0 ? (k ? ' + ' : '') : (k ? ' − ' : '−')}x${k + 1}`).join('');
+          const terms = row.map((x, k) => `${x > 0 ? (k ? ' + ' : '') : (k ? ' - ' : '-')}x_{${k + 1}}`).join('');
           const flips = row.slice(1).reduce((a, x, k) => a + (x !== row[k] ? 1 : 0), 0);
-          note.textContent = `Output ${i + 1} = (${terms}) / √${n}. Every input counts equally, only the signs differ. The sign flips ${flips} times along this row: rows are like square waves of different frequencies, and any two rows agree in exactly half their places, which is what makes them orthogonal.`;
+          setMath(note, `Output ${i + 1}: \\(y_{${i + 1}} = \\frac{1}{\\sqrt{${n}}}\\left(${terms}\\right)\\). Every input counts equally, only the signs differ. The sign flips ${flips} times along this row: rows are like square waves of different frequencies, and any two rows agree in exactly half their places, which is what makes them orthogonal.`);
         });
         grid.append(c);
       }));
       box.replaceChildren(grid);
-      note.textContent = n === 2
-        ? 'The 2×2 matrix: output 1 is the sum of the two inputs, output 2 their difference (each divided by √2).'
-        : `${n}×${n}: four copies of the ${n / 2}×${n / 2} matrix, the bottom-right one (outlined) with its signs flipped. Click a row.`;
+      setMath(note, n === 2
+        ? 'The 2×2 matrix: output 1 is the sum of the two inputs, output 2 their difference (each divided by \\(\\sqrt{2}\\)).'
+        : `${n}×${n}: four copies of the ${n / 2}×${n / 2} matrix, the bottom-right one (outlined) with its signs flipped. Click a row.`);
     };
     buttons.forEach((b) => b.addEventListener('click', () => { press(buttons, b); draw(+b.dataset.n); }));
     draw(16);
@@ -585,7 +591,7 @@
       const t = el('table');
       const hr = el('tr'); hr.append(el('th', null, 'input'));
       for (let r = 1; r <= ROUNDS; r++) hr.append(el('th', null, `round ${r}`));
-      hr.append(el('th', null, `÷ √${N}`)); t.append(hr);
+      hr.append(mel('th', null, `\\(\\div\\sqrt{${N}}\\)`)); t.append(hr);
       const h = k ? 1 << (k - 1) : 0;
       for (let i = 0; i < N; i++) {
         const tr = el('tr'); tr.append(el('td', 'num', String(x0[i])));
@@ -598,11 +604,11 @@
         t.append(tr);
       }
       box.replaceChildren(t);
-      note.textContent = k === 0
-        ? `${N} activations. Multiplying by the 8×8 matrix directly would take 64 multiply-adds.`
+      setMath(note, k === 0
+        ? `${N} activations. Multiplying by the 8×8 matrix directly would take \\(8\\times 8 = 64\\) multiply-adds.`
         : k < ROUNDS
           ? `Round ${k}: pairs ${h} apart are combined. Blue rows got a + b, gold rows a − b.`
-          : `Done after ${ROUNDS} rounds of ${N} additions or subtractions (${ROUNDS * N} in all, no multiplications), then one scaling. For a group of 64 it's 6 rounds: 384 operations instead of 4,096.`;
+          : `Done after ${ROUNDS} rounds of ${N} additions or subtractions (\\(${ROUNDS}\\times ${N} = ${ROUNDS * N}\\) in all, no multiplications), then one scaling. For a group of 64 it's \\(6\\times 64 = 384\\) operations instead of \\(64^2 = 4{,}096\\).`);
     };
     fig.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.act === 'next') k = k >= ROUNDS ? 0 : k + 1;
@@ -653,15 +659,15 @@
       }
       svg.replaceChildren(...kids);
       const e2 = w.reduce((a, x) => a + (x - nearest(x)) ** 2, 0), p2 = w.reduce((a, x) => a + x * x, 0);
-      note.textContent = `${state.bits} bit${state.bits > 1 ? 's' : ''} = ${n} levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(3)}.`;
+      setMath(note, `${state.bits} bit${state.bits > 1 ? 's' : ''} give \\(2^{${state.bits}} = ${n}\\) levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(3)}.`);
       const x = w[state.sel], k = idxOf(x), bits = f32(x);
       panel.replaceChildren(
         el('p', null, `Selected weight: ${x.toFixed(4)}. As a 32-bit float it is these bits (sign, exponent, mantissa):`),
         boxes(bits, (i) => (i === 0 ? 's' : i < 9 ? 'e' : 'm')),
         el('p', null, `Quantized, it is only the number of its nearest level, counting from the left (0 to ${n - 1}). That is ${k}, written in ${state.bits} bit${state.bits > 1 ? 's' : ''}:`),
         boxes(k.toString(2).padStart(state.bits, '0'), 'i'),
-        el('p', null, `To read it back: level = −m + index × gap = −${m.toFixed(4)} + ${k} × ${step.toFixed(4)} = ${nearest(x).toFixed(4)}. The weight was ${x.toFixed(4)}, so the error is ${Math.abs(x - nearest(x)).toFixed(4)}.`),
-        el('p', null, `All ${N} weights: ${N * 32} bits as floats. Quantized: ${N} × ${state.bits} = ${N * state.bits} bits for the indices, plus m = ${m.toFixed(4)} stored once as a 32-bit float, ${N * state.bits + 32} bits in all.`));
+        mel('p', null, `To read it back: \\(\\mathrm{level} = -m + \\mathrm{index}\\times\\mathrm{gap} = -${m.toFixed(4)} + ${k}\\times ${step.toFixed(4)} = ${nearest(x).toFixed(4)}\\). The weight was ${x.toFixed(4)}, so the error is ${Math.abs(x - nearest(x)).toFixed(4)}.`),
+        mel('p', null, `All ${N} weights as 32-bit floats: \\(${N}\\times 32 = ${N * 32}\\) bits. Quantized: \\(${N}\\times ${state.bits} = ${N * state.bits}\\) bits for the indices, plus \\(m = ${m.toFixed(4)}\\) stored once as a 32-bit float, so \\(${N * state.bits} + 32 = ${N * state.bits + 32}\\) bits in all.`));
     };
     svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null) { state.sel = +i; draw(); } });
     $(fig, '[data-k=bits]').addEventListener('input', (e) => { state.bits = +e.target.value; $(fig, '[data-o=bits]').textContent = state.bits; draw(); });
@@ -730,7 +736,7 @@
       esvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); esvg.replaceChildren(...cells(esvg, R * RH, ecol));
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
-      store.textContent = `Storage per row: ${C} weights × 4 bits = ${idx} bits, plus ${ng} scale${ng > 1 ? 's' : ''} × 32 bits = ${scl} bits. Total ${st.rowBits} bits (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`;
+      setMath(store, `Storage per row: \\(${C}\\times 4 = ${idx}\\) bits for the indices, plus \\(${ng}\\times 32 = ${scl}\\) bits for the scale${ng > 1 ? 's' : ''}, \\(${st.rowBits}\\) bits in all (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`);
       const rows = [['groups per row', 'error', 'bits per row']];
       SIZES.forEach((sz, i) => { const s2 = stats(sz); rows.push([`${C / sz} of ${sz}`, `${(s2.rel * 100).toFixed(1)}%`, String(s2.rowBits), i]); });
       tab.replaceChildren(...rows.map((r, i) => { const tr = el('tr'); r.slice(0, 3).forEach((t, j) => tr.append(el(i ? 'td' : 'th', j ? 'num' : null, t))); if (i) { tr.dataset.i = r[3]; if (r[3] === state.g) tr.className = 'on'; } return tr; }));

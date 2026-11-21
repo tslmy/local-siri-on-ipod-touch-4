@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=23" />
+    <link rel="stylesheet" href="assets/explainer.css?v=24" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -205,9 +205,9 @@
 <p><strong>First, plain quantization.</strong> A weight is a number such as 0.137, and a float stores it in 32 bits. Quantization stores a rougher copy instead:</p>
 <ul>
 <li><strong>Levels.</strong> Choose a small set of allowed values, called levels.</li>
-<li><strong>Index.</strong> For each weight, remember only which level is nearest. With 16 levels the index fits in 4 bits, an eighth of the 32, so the model shrinks eightfold.</li>
+<li><strong>Index.</strong> For each weight, remember only which level is nearest. With \(2^b\) levels the index takes \(b\) bits, so 16 levels take \(b = 4\) bits: an eighth of the 32, and the model shrinks \(32/4 = 8\) times.</li>
 <li><strong>Rounding error.</strong> Every weight moves to its nearest level, and the distance it moves is its rounding error. That is the price: precision.</li>
-<li><strong>Scale.</strong> The simplest levels are spread evenly from −<em>m</em> to +<em>m</em>, where <em>m</em> is the largest weight in absolute value. That one number is stored alongside, so the levels can be turned back into real values.</li>
+<li><strong>Scale.</strong> The simplest levels are spread evenly from \(-m\) to \(+m\), where \(m\) is the largest weight in absolute value. With \(2^b\) levels the gap between neighbours is \(\mathrm{gap} = \dfrac{2m}{2^b - 1}\), and level number \(k\), counting from 0, is \(-m + k\cdot\mathrm{gap}\). That one number \(m\) is stored alongside, so the levels can be turned back into real values.</li>
 </ul>
 
 <p>Slide the number of bits and watch the error. Then add an outlier:</p>
@@ -237,7 +237,7 @@
 <ul>
 <li>A weight matrix has millions of numbers, and one outlier anywhere would stretch the levels for all of them.</li>
 <li>So each row is split, from left to right, into groups of 64 consecutive weights (128 in Whistle), and each group gets its own scale. A group never spans rows. An outlier now only spoils its own group.</li>
-<li>The scale is the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a> (the square root of the sum of squares), stored once.</li>
+<li>The scale is the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a> \(\ell = \sqrt{\textstyle\sum_j w_j^2}\), the square root of the sum of squares, stored once.</li>
 <li>Inside the group, each weight only has to say "which of 16 levels am I closest to", and 16 levels take 4 bits.</li>
 </ul>
 
@@ -297,7 +297,7 @@
 
 <p><strong>Step 2: rotate the group.</strong> Grouping stops an outlier from spoiling its whole row, but inside its own group it still stretches the levels for the other 63 weights.</p>
 <ul>
-<li>What matters is how spiky the group is: its largest weight compared with the group's overall size, which is its length.</li>
+<li>What matters is how spiky the group is: \(\max_j |w_j| \,/\, \ell\), its largest weight compared with the group's overall size, which is its length \(\ell\).</li>
 <li>You can't remove a spike without changing the weights.</li>
 <li>But you can change the axes you write them against.</li>
 </ul>
@@ -358,7 +358,8 @@
 <li><strong>Nothing is lost.</strong> A rotation keeps every point's length and can be undone exactly by rotating back, so the rounding error is the same size whichever side you measure it on.</li>
 <li><strong>It costs no bits.</strong> There is nothing extra to store.</li>
 </ul>
-<p>And how much it flattens depends on how many weights share the rotation. A lone spike of any size ends up, after a Hadamard rotation, equally spread over all the outputs:</p>
+<p>And how much it flattens depends on how many weights share the rotation. A lone spike of any size ends up, after a Hadamard rotation, equally spread over all \(n\) outputs, so each output holds \(1/\sqrt{n}\) of its length:</p>
+\[ \frac{\text{largest coordinate}}{\text{length}} \;=\; \frac{1}{\sqrt{n}} \]
 <div class="wide"><table>
 <thead><tr><th>Weights in the group</th><th class="num">Largest coordinate after rotating a lone spike</th></tr></thead>
 <tbody>
@@ -484,7 +485,7 @@ Here are the entries of these matrices, before the scaling:</p>
 
 <p>What it costs to store:</p>
 <ul>
-<li>A group of 64 weights takes 64 × 4 bits plus one 32-bit length, which is 4.5 bits per weight on average, because the one length is shared by all 64.</li>
+<li>A group of 64 weights takes \(64\times 4\) bits plus one 32-bit length, which is \(\dfrac{64\times 4 + 32}{64} = 4.5\) bits per weight on average, because the one length is shared by all 64.</li>
 <li>SmolLM2 went from 538 MB to 76 MB.</li>
 <li>Whistle is 16.9 MB.</li>
 </ul>
@@ -506,7 +507,7 @@ Here are the entries of these matrices, before the scaling:</p>
 <li>Multiply-accumulate instructions then sum 8 or 16 products at a time.</li>
 </ul>
 
-<p>The rotation itself is cheap thanks to the <a href="https://en.wikipedia.org/wiki/Fast_Walsh%E2%80%93Hadamard_transform">fast Walsh–Hadamard transform</a>. Because the matrix is built by doubling, it can be applied in log₂ n rounds of add-and-subtract on pairs, the same <a href="https://en.wikipedia.org/wiki/Butterfly_diagram">butterfly</a> pattern as the FFT, with no multiplications:</p>
+<p>The rotation itself is cheap thanks to the <a href="https://en.wikipedia.org/wiki/Fast_Walsh%E2%80%93Hadamard_transform">fast Walsh–Hadamard transform</a>. Because the matrix is built by doubling, it can be applied in \(\log_2 n\) rounds of add-and-subtract on pairs, the same <a href="https://en.wikipedia.org/wiki/Butterfly_diagram">butterfly</a> pattern as the FFT, with no multiplications:</p>
 
 <figure class="widget wide" data-widget="fwht">
   <figcaption><strong>The fast transform on 8 numbers.</strong> Each round replaces pairs (a, b) with (a + b, a − b). Step through the rounds.</figcaption>
@@ -607,6 +608,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=23" defer></script>
+    <script src="assets/explainer.js?v=24" defer></script>
   </body>
 </html>
