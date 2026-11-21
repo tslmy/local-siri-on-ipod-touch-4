@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=27" />
+    <link rel="stylesheet" href="assets/explainer.css?v=28" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -322,7 +322,7 @@
     <span class="sx-rowlabel">Levels</span>
     <span class="sx-seg"><button data-mode="plain" aria-pressed="true">reach each group's largest weight</button><button data-mode="fixed" aria-pressed="false">one fixed grid for all groups</button></span>
   </div>
-  <p class="sx-cap2">In the first, the square is redrawn around each group so that it just reaches its largest coordinate: the plain scheme from the start of this section. In the second, the group's length has been divided out and the grid is the same for every group, sized here for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed in the same way, but it is Gaussian-shaped and built for groups of 64 weights. The curve shows, at every angle, how big the largest weight is as a share of the group's length, averaged over the dots (lower is flatter, and the rounding error follows it). The gold line marks 45°, where the rotation matches the 2×2 Hadamard matrix. Now rotate:</p>
+  <p class="sx-cap2">In the first, every group has its own scale (step 1): its square is redrawn to just reach its largest coordinate, with the evenly spaced levels of plain quantization. In the second, the group's length has been divided out and one grid is shared by every group, as in the codebook of step 3. It is sized here for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed in the same way, but it is Gaussian-shaped and built for groups of 64 weights. The curve shows, at every angle, how big the largest weight is as a share of the group's length, averaged over the dots (lower is flatter, and the rounding error follows it). The gold line marks 45°, where the rotation matches the 2×2 Hadamard matrix. Now rotate:</p>
   <div class="sx-controls">
     <span class="sx-rowlabel">Rotation</span>
     <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
@@ -628,6 +628,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=27" defer></script>
+    <script src="assets/explainer.js?v=28" defer></script>
   </body>
 </html>
