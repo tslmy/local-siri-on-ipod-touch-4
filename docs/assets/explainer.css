@@ -208,9 +208,10 @@
 .siri-explainer figure.widget button[aria-pressed=true]::after { transform: translateX(.75rem); }
 .siri-explainer figure.widget button[aria-pressed]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .siri-explainer figure.widget .sx-seg { display: inline-flex; margin: 0 .7rem .3rem 0; border: 1px solid var(--sx-rule); border-radius: 6px; overflow: hidden; vertical-align: middle; flex-wrap: wrap; }
-.siri-explainer figure.widget .sx-seg button[aria-pressed] { margin: 0; padding: .25rem .7rem; border-radius: 0; background: transparent; }
-.siri-explainer figure.widget .sx-seg button[aria-pressed]::before, .siri-explainer figure.widget .sx-seg button[aria-pressed]::after { display: none; }
+.siri-explainer figure.widget .sx-seg button { margin: 0; padding: .25rem .7rem; border: 0; border-radius: 0; background: transparent; color: var(--text); }
+.siri-explainer figure.widget .sx-seg button::before, .siri-explainer figure.widget .sx-seg button::after { display: none; }
 .siri-explainer figure.widget .sx-seg button + button { border-left: 1px solid var(--sx-rule); }
+.siri-explainer figure.widget .sx-seg button:hover { background: color-mix(in srgb, var(--text) 8%, transparent); }
 .siri-explainer figure.widget .sx-seg button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 16%, var(--bg)); font-weight: bold; }
 .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed] { padding: .4rem .55rem; background: var(--bg); }
 .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::before, .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::after { display: none; }
