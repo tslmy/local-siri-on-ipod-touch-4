@@ -134,3 +134,11 @@
   .sx-tl .row, .sx-tl .axis { grid-template-columns: 6rem 1fr; }
   .sx-mem { grid-template-columns: repeat(8, 1fr); }
 }
+
+.sx-sp { width: 100%; height: auto; display: block; }
+.sx-sp .axis { stroke: var(--muted); stroke-width: 1; }
+.sx-sp .before { fill: var(--sx-red); }
+.sx-sp .after { fill: var(--sx-blue); }
+.sx-sp .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+.siri-explainer .sx-controls label { margin-right: .9rem; font-size: .85rem; white-space: nowrap; }
+.siri-explainer .sx-controls output { font-family: var(--sx-mono); }
