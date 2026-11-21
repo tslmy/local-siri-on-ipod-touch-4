@@ -763,10 +763,9 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <li>Divide each group by its length, which is stored as the group's scale. What is left is a direction, so every group is on the same footing.</li>
 <li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
 <li>Each weight stores the 4-bit index of its nearest level.</li>
-<li>With 2 bits there are only 4 levels. Whistle mixes 2- and 4-bit layers.</li>
 </ul>
 
-<p>To see how the levels are found, step through Lloyd's algorithm. The bars are a pile of rotated values, a bell curve, and the levels start out evenly spaced:</p>
+<p>To see how the levels are found, step through Lloyd's algorithm. The bars are a pile of rotated values, a bell curve, and the levels start out evenly spaced. The bits slider sets how many levels there are: 2 bits give 4 levels, 3 give 8, 4 give 16:</p>
 
 <figure class="widget wide" data-widget="lloyd">
   <figcaption><strong>Finding the levels with Lloyd's algorithm.</strong> Gold ticks are the levels, and the dashed lines between them cut the number line into the zone each level serves. Each step sends every value to its nearest level, then moves each level to the average of the values it got.</figcaption>
@@ -992,6 +991,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=114" defer></script>
+    <script src="assets/explainer.js?v=115" defer></script>
   </body>
 </html>
