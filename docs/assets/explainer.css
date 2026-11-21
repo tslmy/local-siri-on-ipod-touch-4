@@ -215,3 +215,12 @@
 .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::before, .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed]::after { display: none; }
 .siri-explainer figure.widget .sx-inv button.sx-item[aria-pressed=true] { background: color-mix(in srgb, var(--text) 14%, var(--bg)); }
 .sx-r3 .pax { stroke: var(--sx-gold); stroke-width: 1.5; stroke-dasharray: 5 4; }
+
+/* Foldable detours */
+.siri-explainer details.detour { margin: 1.6rem 0; padding: .1rem 0 .1rem 1rem; border-left: 3px solid var(--sx-gold); }
+.siri-explainer details.detour > summary { cursor: pointer; font: bold .95rem var(--sx-sans); color: var(--muted); padding: .5rem 0; list-style: none; }
+.siri-explainer details.detour > summary::-webkit-details-marker { display: none; }
+.siri-explainer details.detour > summary::before { content: '\25B8'; display: inline-block; width: 1.1rem; transition: transform .15s; }
+.siri-explainer details.detour[open] > summary::before { transform: rotate(90deg); }
+.siri-explainer details.detour > summary:hover { color: var(--text); }
+.siri-explainer details.detour[open] > summary { margin-bottom: .4rem; }
