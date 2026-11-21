@@ -335,7 +335,7 @@
     const had = fig.hasAttribute('data-had');
     const CX = 165, CY = 150, S = 118, state = { deg: 0, sel: 0, sp: 100, n: 3, at: 'axes', mode: 'plain', follow: false }; let seed = 4, pts = [], base = [];
     const rng = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-    const svg = $(fig, 'svg'), note = $(fig, '.sx-readout'), NS = 'http://www.w3.org/2000/svg';
+    const svg = $(fig, 'svg.sx-r2'), note = $(fig, '.sx-readout'), NS = 'http://www.w3.org/2000/svg';   // the plot, not the matrices above it
     const mk = (tag, attrs, style) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); if (style) e.style.cssText = style; return e; };
     const on = (sel, ev, fn) => { const e = $(fig, sel); if (e) e.addEventListener(ev, fn); };
     const gen = () => { const r = rng(seed); base = []; for (let i = 0; i < 8; i++) base.push({ k: i % 4, u: (r() - .5) * 2 }); state.sel = 0; };
