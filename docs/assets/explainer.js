@@ -389,12 +389,12 @@
           kids.push(sv('rect', { x: cx0 + i * 11, y: cy0 - 13, width: 8, height: 8, rx: 1.5 }, `fill:${col(i)}`));   // one chip per square, so squares lying on top of each other still count
         });
         else { kids.push(square(FLAT, 'stroke:var(--sx-gold);stroke-width:1.6')); grid(FLAT, 'fill:var(--muted)', 2); }
-        P.forEach((p, i) => {                              // an arrow from each group to the grid point it is stored as
-          const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 4) return;
-          const ux = (x2 - x1) / d, uy = (y2 - y1) / d, hl = Math.min(11, d * .6), bx = x2 - ux * hl, by = y2 - uy * hl, wd = i === rot.sel ? 3 : 2.2, hw = hl * .45;
-          const tri = `${x2},${y2} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}`;
-          kids.push(line(x1, y1, bx, by, 'snap3', `stroke:var(--bg);stroke-width:${wd + 3.5}`), sv('polygon', { points: tri, class: 'arrh' }, 'fill:var(--bg);stroke:var(--bg);stroke-width:3.5;stroke-linejoin:round'));   // a background-coloured casing, so the arrow reads as lying on top of the edge
-          kids.push(line(x1, y1, bx, by, 'snap3', `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
+        P.forEach((p, i) => {                              // an arrow from each group to the grid point it is stored as, from the edge of its dot to the edge of the ring that marks the destination
+          const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 22) return;
+          const ux = (x2 - x1) / d, uy = (y2 - y1) / d, sx = x1 + ux * 8, sy = y1 + uy * 8, tx = x2 - ux * 8, ty = y2 - uy * 8, hl = Math.min(11, (d - 16) * .7), bx = tx - ux * hl, by = ty - uy * hl, wd = i === rot.sel ? 3 : 2.2, hw = hl * .45;
+          const tri = `${tx},${ty} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}`;
+          kids.push(line(sx, sy, bx, by, 'snap3', `stroke:var(--bg);stroke-width:${wd + 3.5}`), sv('polygon', { points: tri, class: 'arrh' }, 'fill:var(--bg);stroke:var(--bg);stroke-width:3.5;stroke-linejoin:round'));   // a background-coloured casing, so the arrow reads as lying on top of the edge
+          kids.push(line(sx, sy, bx, by, 'snap3', `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
         });
       }
       const bin = (k) => k.toString(2).padStart(2, '0');
@@ -402,10 +402,15 @@
         const o = Q[rot.sel], st = 2 * o.m / 3;
         for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); }
       }
+      if (has('quant')) Q.forEach((o, i) => {            // a hollow ring where each group is stored: the dot moved there
+        const [x, y] = pt(o.q[0], o.q[1]), [px, py] = pt(P[i][0], P[i][1]);
+        kids.push(sv('circle', { cx: x, cy: y, r: 8, class: 'dest' }, `stroke:${col(i)};stroke-width:${i === rot.sel ? 3 : 2}`));
+        if (Math.hypot(x - px, y - py) >= 22) kids.push(word(x, y + .5, i + 1, 'middle', 'lbl gnum', `fill:${col(i)};dominant-baseline:central`));
+      });
       if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 7, class: 'ghost' }, `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
       P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 8, class: 'pt' + (i === rot.sel ? ' sel' : ''), 'data-i': i }, `fill:${col(i)}`)); });
       P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(word(cx, cy + .5, i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its dot
-      if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 8 : -8), y + (below ? 15 : -9), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // flip inwards near the edges so the label stays in view   // the stored value of each group
+      if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // flip inwards near the edges so the label stays in view   // the stored value of each group
       let curve = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle
         const spike = (d) => grp.reduce((a, g) => { const q = turn2(g.dir, d); return a + Math.max(Math.abs(q[0]), Math.abs(q[1])); }, 0) / N;
