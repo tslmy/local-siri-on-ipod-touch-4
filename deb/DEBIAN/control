@@ -1,0 +1,16 @@
+Package: com.lmy.local-siri
+Name: Local Siri (engine)
+Version: @VERSION@
+Architecture: iphoneos-arm
+Section: Utilities
+Priority: optional
+Depends: mobilesubstrate, firmware (>= 6.1)
+Maintainer: tslmy
+Author: tslmy
+Homepage: https://github.com/tslmy/local-siri-on-ipod-touch-4
+Description: Siri on iPod touch 4G, answered entirely on the device
+ Speech recognition (Whistle) and a small language model (SmolLM2-135M),
+ an ACE server and a tweak that make iOS 6 Siri talk to them instead of Apple.
+ iPod touch 4G on iOS 6.1.x only.
+ Siri's own files are Apple's and are NOT in this package: add them from
+ your own iPhone 4S firmware download (see the project README).

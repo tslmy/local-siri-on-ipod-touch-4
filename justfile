@@ -82,3 +82,11 @@ install-app:
 # Delete build outputs (keeps the toolchain, the firmware download and the models)
 clean:
     rm -rf build/ipod build/stage build/decache build/port build/siri-files.tgz
+
+# Package the on-device engine and models as build/com.lmy.local-siri_<version>_iphoneos-arm.deb (nothing from Apple)
+deb version: build models
+    python3 scripts/mkdeb.py "{{version}}"
+
+# With the .deb installed from Cydia: add Apple's Siri files from your own firmware download, then switch Siri on
+apple-files xcode_dmg:
+    bash scripts/apple-files.sh "{{xcode_dmg}}"

@@ -1,0 +1,6 @@
+#!/bin/sh
+case "$1" in configure)
+  chmod 755 /var/root/siri/run.sh /var/root/siri/ace/run.sh /var/root/siri/activate.sh /var/root/siri/deactivate.sh
+  /var/root/siri/activate.sh ;;
+esac
+exit 0

@@ -1,0 +1,20 @@
+Local Siri on iPod touch 4G
+===========================
+Original code (localsirid, acesrv, the SiriCapability tweak, scripts): MIT, (c) 2026 tslmy.
+https://github.com/tslmy/local-siri-on-ipod-touch-4  (source for everything in this package)
+
+Contains, as separate works under their own licences:
+
+* Whistle speech model, (c) Cactus Compute. Apache License 2.0 (Apache-2.0.txt).
+  https://huggingface.co/Cactus-Compute/whistle  (whistle.cact, unmodified, revision 88cb00e).
+
+* SmolLM2-135M-Instruct, (c) Hugging Face. Apache License 2.0 (Apache-2.0.txt).
+  https://huggingface.co/HuggingFaceTB/SmolLM2-135M-Instruct
+  MODIFIED: the weights were quantised to a 4-bit codebook format with GPTQ-style rounding
+  (smollm2-135m-cq4.bin) and the tokenizer re-encoded (smollm2-135m.tok), using convert/llm_convert.py.
+
+* Speex 1.2.1, (c) Xiph.Org Foundation, Jean-Marc Valin and others. BSD (Speex-BSD.txt).
+  Compiled into acesrv.
+
+NOT included: any Apple software. Siri's frameworks and AssistantUI come from Apple's iPhone 4S
+iOS 6.1.3 firmware, which each user downloads from Apple; do not redistribute them.

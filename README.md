@@ -137,6 +137,16 @@ The 8.1 is measured with the iPod's 8-bit activations simulated, and the 8.9 wit
 
 `/etc/hosts` gains the line `127.0.0.1 guzzoni.apple.com`. Siri only accepts a server override whose host ends in `apple.com`, and it falls back to Apple's real server otherwise. With this line, both its override and its fallback land on the iPod itself, so nothing you say leaves the device.
 
+## Install from the release (no models or compiler needed)
+
+The [GitHub release](https://github.com/tslmy/local-siri-on-ipod-touch-4/releases) has `com.lmy.local-siri_<version>_iphoneos-arm.deb`: the binaries, the tweak and both models (88 MB). Install it with `dpkg -i` over SSH, or open it in Filza. It does **not** contain Apple's Siri files. On a Mac, add those from your own firmware download:
+
+```sh
+IPOD=root@<your iPod> just apple-files ~/Downloads/xcode4630916281a.dmg
+```
+
+That fetches the iPhone 4S firmware from Apple, extracts the Siri files, copies them to the iPod and switches Siri on. `just deb <version>` rebuilds the package.
+
 ## Legal
 
 This repository contains only original code and scripts (MIT licensed). **It contains nothing from Apple**:
@@ -149,6 +159,12 @@ Third-party code is fetched at build time and isn't vendored:
 - [kennytm's `dyld_decache`](https://github.com/kennytm/Miscellaneous) (GPLv3), which is only run on your Mac.
 
 The models are downloaded from Hugging Face under their own licences: Apache-2.0 for Whistle and SmolLM2, MIT for Moonshine.
+
+The release `.deb` redistributes some of this, with `NOTICE` and licence texts in `/usr/share/doc/com.lmy.local-siri/`:
+- Whistle (Apache-2.0), unmodified.
+- SmolLM2-135M-Instruct (Apache-2.0), quantised to 4 bits and re-encoded; the notice says so.
+- Speex (BSD), compiled into `acesrv`.
+- Moonshine isn't in the package.
 
 ## Layout
 
