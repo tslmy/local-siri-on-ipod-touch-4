@@ -402,9 +402,9 @@
         const o = Q[rot.sel], st = 2 * o.m / 3;
         for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); }
       }
-      if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 4, class: 'ghost' }, `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
-      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 5.5, class: 'pt' + (i === rot.sel ? ' sel' : ''), 'data-i': i }, `fill:${col(i)}`)); });
-      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]), right = cx >= CX; kids.push(word(cx + (right ? 9 : -9), cy + 4, i + 1, right ? 'start' : 'end', 'lbl gnum', `fill:${col(i)}`)); });
+      if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 7, class: 'ghost' }, `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
+      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 8, class: 'pt' + (i === rot.sel ? ' sel' : ''), 'data-i': i }, `fill:${col(i)}`)); });
+      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(word(cx, cy + .5, i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its dot
       if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 8 : -8), y + (below ? 15 : -9), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // flip inwards near the edges so the label stays in view   // the stored value of each group
       let curve = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle

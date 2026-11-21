@@ -278,7 +278,7 @@
 .sx-r2 .sq { fill: none; }
 .sx-r2 .gd { opacity: .55; }
 .sx-r2 .pt.sel { stroke: var(--text); }
-.sx-r2 .gnum { font-weight: bold; font-size: 12px; pointer-events: none; }
+.sx-r2 .gnum { font-weight: bold; font-size: 10px; pointer-events: none; }
 
 /* The three lines of cells inside the 2D figure: the same cell size as the grouping figure, growing to the right */
 .sx-trip { margin: .5rem 0 .9rem; }
