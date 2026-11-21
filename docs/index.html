@@ -627,9 +627,18 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <p>So the rotation is settled: one Hadamard matrix, applied to every group. Next come the levels.</p>
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
+
+<p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat the savings.</p>
+<ul>
+<li><strong>The rotated values have a known shape.</strong> Each rotated weight is a mix of all the weights in its group, so by the central limit theorem the values pile up in a bell curve: most near zero, few in the tails. Evenly spaced levels waste themselves on the tails, where almost nothing lands, and leave the crowded middle coarsely rounded.</li>
+<li><strong>Because the shape is known in advance, the levels can be designed once, ahead of time.</strong> They need only be dense where the bell is tall and sparse where it is short.</li>
+<li><strong>That only works if every group looks the same,</strong> so each group is divided by its own length first. Then the groups differ only in the scale we store, and one shared set of levels (the codebook) serves them all, with nothing extra to store per group.</li>
+<li><strong>A small shared codebook is fast.</strong> With 4 bits it has 16 entries, which fit in one CPU register and can be looked up for many weights at once (this is step 4).</li>
+</ul>
+
+<p>So the step has these parts:</p>
 <ul>
 <li>Divide each group by its length, which is stored as the group's scale. What is left is a direction, so every group is on the same footing.</li>
-<li>Rotated groups all have roughly the same bell shape, so one set of levels can serve all of them.</li>
 <li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
 <li>Each weight stores the 4-bit index of its nearest level.</li>
 <li>With 2 bits there are only 4 levels. Whistle mixes 2- and 4-bit layers.</li>
