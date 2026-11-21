@@ -252,3 +252,9 @@
 /* LaTeX (KaTeX) */
 .siri-explainer .katex { font-size: 1.05em; }
 .siri-explainer .katex-display { margin: .9rem 0; overflow-x: auto; overflow-y: hidden; padding: .2rem 0; }
+
+/* Control rows inside figures */
+.siri-explainer figure.widget .sx-rowlabel { font-weight: bold; margin-right: .7rem; display: inline-block; min-width: 6.2rem; }
+.siri-explainer figure.widget .sx-cap2 { color: var(--muted); margin: .9rem 0 .7rem; }
+.siri-explainer figure.widget .callout { margin-top: 1rem; }
+.siri-explainer figure.widget .callout ul { margin: .5rem 0; padding-left: 1.2rem; }

@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=25" />
+    <link rel="stylesheet" href="assets/explainer.css?v=26" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -237,7 +237,7 @@
 <ul>
 <li>A weight matrix has millions of numbers, and one outlier anywhere would stretch the levels for all of them.</li>
 <li>So each row is split, from left to right, into groups of 64 consecutive weights (128 in Whistle), and each group gets its own scale. A group never spans rows. An outlier now only spoils its own group.</li>
-<li>The scale is the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a> \(\ell = \sqrt{\textstyle\sum_j w_j^2}\), the square root of the sum of squares, stored once.</li>
+<li>The scale is a number stored once per group. In the plain scheme it is the group's largest weight, which is what the figure below uses. Whistle stores the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a>, \(\ell = \sqrt{\textstyle\sum_j w_j^2}\), instead, for reasons that become clear in step 3.</li>
 <li>Inside the group, each weight only has to say "which of 16 levels am I closest to", and 16 levels take 4 bits.</li>
 </ul>
 
@@ -276,7 +276,7 @@
 <p>To get a feel for what grouping buys, try it on a toy matrix of 12 rows and 64 columns. Slide the number of groups per row up from one (a single scale for the whole row) and watch the rounding error. Here the 16 levels are spread evenly up to the largest weight in each group, the plain scheme from the figure above:</p>
 
 <figure class="widget wide" data-widget="grouping">
-  <figcaption><strong>Why weights are grouped.</strong> Each cell is one weight (blue negative, red positive). White lines separate the rows and the groups within each row, and each group gets its own scale: the number printed on its cells, which is its largest weight. Every row has its own groups and scales. Outliers have a gold outline. Turn them off to see how much of the effect they cause.</figcaption>
+  <figcaption><strong>Why weights are grouped.</strong> Each cell is one weight (blue negative, red positive). White lines separate the rows and the groups within each row, and each group gets its own scale: the number printed on its cells, which is its largest weight (the plain scheme; Whistle uses the group's length instead). Every row has its own groups and scales. Outliers have a gold outline. Turn them off to see how much of the effect they cause.</figcaption>
   <div class="sx-controls">
     <label>Groups per row <input type="range" min="0" max="4" step="1" value="0" data-k="g"> <output data-o="g"></output></label>
     <label><input type="checkbox" checked data-k="out"> outliers</label>
@@ -310,18 +310,38 @@
 </ul>
 
 <figure class="widget wide" data-widget="rot2d">
-  <figcaption><strong>Rotating groups of two weights.</strong> Each dot is one group, a point on a circle of length 1 (the group's length is divided out, as in step 1). The "spiky groups" slider sets how close the dots sit to the axes: at 100% every group has one big weight, and at 0% the directions are spread evenly round the circle. The square is the range its levels must cover, with 4 levels per axis (2 bits). The curve shows, at every angle, how big the largest weight is as a share of the group's length, averaged over the dots (lower is flatter, and the rounding error follows it). The gold line marks 45°, where the rotation matches the 2×2 Hadamard matrix.</figcaption>
+  <figcaption><strong>Rotating groups of two weights.</strong> Each dot is one group of two weights, drawn as a point on a circle of length 1 (the group's length is divided out, as in step 1). First, make up some groups:</figcaption>
   <div class="sx-controls">
-    <label>Rotate <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
+    <span class="sx-rowlabel">Mock groups</span>
+    <span class="sx-seg"><button data-at="axes" aria-pressed="true">near the axes</button><button data-at="diag" aria-pressed="false">near the diagonals</button></span>
     <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <button data-act="new">new points</button>
+  </div>
+  <p class="sx-cap2">Near the axes means each group has one big weight and one small one. The "spiky groups" slider sets how tightly the dots hug that place: at 100% every group is within 10° of it, and at 0% the directions are spread evenly round the circle. Next, the levels. The gold square marks their range, 4 per axis (2 bits). The small grey dots are the 16 values a group can be stored as: each of its two coordinates is rounded to the nearest level, and the red line shows where the selected group lands. Choose how the levels are placed:</p>
+  <div class="sx-controls">
+    <span class="sx-rowlabel">Levels</span>
+    <span class="sx-seg"><button data-mode="plain" aria-pressed="true">reach each group's largest weight</button><button data-mode="fixed" aria-pressed="false">one fixed grid for all groups</button></span>
+  </div>
+  <p class="sx-cap2">In the first, the square is redrawn around each group so that it just reaches its largest coordinate: the plain scheme from the start of this section. In the second, the group's length has been divided out and the grid is the same for every group, sized here for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed in the same way, but it is Gaussian-shaped and built for groups of 64 weights. The curve shows, at every angle, how big the largest weight is as a share of the group's length, averaged over the dots (lower is flatter, and the rounding error follows it). The gold line marks 45°, where the rotation matches the 2×2 Hadamard matrix. Now rotate:</p>
+  <div class="sx-controls">
+    <span class="sx-rowlabel">Rotation</span>
+    <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
     <button data-act="had">45° (Hadamard)</button>
     <button data-act="reset">reset</button>
-    <button data-act="new">new points</button>
   </div>
   <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Points on a circle with the square of quantization levels around the selected point, and a curve of average rounding error against rotation angle"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
   <div class="sx-mat"></div>
-  <p class="sx-note">In two dimensions the match is exact: the Hadamard matrix is the 45° rotation with its two outputs swapped. Swapping outputs does not change the rounding error, because the grid is the same either way. Slide "spiky groups" toward 0 and the curve flattens: if the directions are already spread evenly, no rotation helps on average, so the rotation pays off only when groups have outliers. As before, the rotation slider is only an animation: Whistle applies the matrix once, all at once.</p>
+  <p class="sx-note">In two dimensions the match is exact: the Hadamard matrix is the 45° rotation with its two outputs swapped. Swapping outputs does not change the rounding error, because the grid is the same either way. As before, the rotation slider is only an animation: Whistle applies the matrix once, all at once.</p>
+  <div class="callout">
+    <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and it is worth being clear which:
+    <ul>
+    <li><strong>Groups with one big weight, which sit near the axes.</strong> They are as far from 45° as possible, so turning by 45° brings them to the flat direction. That is the "near the axes" setting at 100% above.</li>
+    <li><strong>Not groups that sit near the diagonals.</strong> Switch to "near the diagonals" and the curve flips: they are already flat, and 45° turns them into spikes.</li>
+    <li><strong>Not groups spread evenly in every direction.</strong> The curve is nearly flat and no angle helps on average.</li>
+    </ul>
+    With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
+  </div>
 </figure>
 
 <p>With three weights, the same picture is a point in 3D space, one weight per axis:</p>
@@ -608,6 +628,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=25" defer></script>
+    <script src="assets/explainer.js?v=26" defer></script>
   </body>
 </html>
