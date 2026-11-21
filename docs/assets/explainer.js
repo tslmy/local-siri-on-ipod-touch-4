@@ -708,7 +708,10 @@
       const cells = (svg, h, color, labels) => {
         const kids = [];
         for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(mk('rect', { x: c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
-        for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH + 1.5, y2: (r + 1) * RH - 1.5, class: 'gl' }));   // each row has its own boundaries
+        if (ng > 1) {                                       // white lines between rows, so each row is its own strip of groups
+          for (let r = 1; r < R; r++) kids.push(mk('line', { x1: 0, x2: C * CW, y1: r * RH, y2: r * RH, class: 'gl' }));
+          for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH, y2: (r + 1) * RH, class: 'gl' }));
+        }
         if (state.out) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outl[r][c]) kids.push(mk('rect', { x: c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
         if (labels) for (let r = 0; r < R; r++) st.scales[r].forEach((sc, g) => { const t = mk('text', { x: (g + .5) * gs * CW, y: r * RH + RH * .5, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gv' }); t.textContent = sc.mx.toFixed(1); kids.push(t); });   // each group's scale, on its cells
         kids.push(mk('rect', { x: 1, y: state.sel * RH + 1, width: C * CW - 2, height: RH - 2, class: 'sel' }));
