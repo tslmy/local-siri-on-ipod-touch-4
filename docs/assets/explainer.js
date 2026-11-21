@@ -19,6 +19,22 @@
     return { vecs: order.map((i) => V.map((row) => row[i])), vals: order.map((i) => A[i][i]) };
   };
 
+  // A "spin the view" switch for the 3D figures: turns the camera about the vertical axis while it is on and on screen
+  const spin = (fig, state, draw, busy) => {
+    const b = $(fig, '[data-act=spin]'); let raf = 0, last = 0, seen = true;
+    const on = () => b.getAttribute('aria-pressed') === 'true';
+    const tick = (t) => {
+      if (!on() || !seen || document.hidden) { raf = 0; return; }
+      const dt = last ? Math.min(.05, (t - last) / 1000) : 0; last = t;
+      if (!busy()) { state.yaw += dt * .7; draw(); }
+      raf = requestAnimationFrame(tick);
+    };
+    const start = () => { if (!raf) { last = 0; raf = requestAnimationFrame(tick); } };
+    if ('IntersectionObserver' in window) new IntersectionObserver((es) => { seen = es[0].isIntersecting; if (seen && on()) start(); }).observe(fig);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden && on()) start(); });
+    b.addEventListener('click', () => { const v = !on(); b.setAttribute('aria-pressed', String(v)); if (v) start(); });
+  };
+
   // 1. Where each piece of Siri comes from
   const inventory = (fig) => {
     const items = [
@@ -340,6 +356,7 @@
     });
     window.addEventListener('pointerup', () => { setTimeout(() => { drag = null; }, 0); });
     svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null && !(drag && drag.moved)) { state.sel = +i; draw(); } });
+    spin(fig, state, draw, () => !!drag);
     set(0);
   };
 
@@ -402,6 +419,7 @@
     svg.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch }; });
     window.addEventListener('pointermove', (e) => { if (!drag) return; state.yaw = drag.yaw + (e.clientX - drag.x) * 0.01; state.pitch = Math.max(0.05, Math.min(1.4, drag.pitch + (e.clientY - drag.y) * 0.01)); draw(); });
     window.addEventListener('pointerup', () => { drag = null; });
+    spin(fig, state, draw, () => !!drag);
     $(fig, '[data-o=t]').textContent = '0%'; rebuild();
   };
 
