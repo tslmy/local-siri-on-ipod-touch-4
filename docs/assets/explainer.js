@@ -925,10 +925,9 @@
     const state = { g: 3, out: true, nout: 6, size: 8, sel: 0 }; let seed = 7;
     const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const gauss = () => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
-    const spiky = () => gauss() * Math.exp(.7 * gauss()) / 1.63;   // each weight has its own random size, so most are small and a few are large, like real weights
     let base = [], outl = [], outList = [];
     const gen = () => {
-      base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => spiky() * s); });
+      base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => gauss() * s); });
       const rows = Array.from({ length: R }, (_, i) => i);     // outliers go in different rows, so each one is in a group of its own at any group size
       for (let i = R - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [rows[i], rows[j]] = [rows[j], rows[i]]; }
       outList = rows.map((r0) => ({ r: r0, c: Math.floor(rng() * C), sign: rng() < .5 ? -1 : 1, u: rng() }));
