@@ -377,43 +377,6 @@
   <p class="sx-note">The rotation slider is only an animation: in practice a rotation is applied once, all at once.</p>
 </figure>
 
-<h4 id="s2-tell" data-toc="Spiky or flat?">Spiky or flat? Telling them apart</h4>
-
-<p>So a rotation helps spiky groups and hurts flat ones. That raises a natural question: how do we tell which kind a group is?</p>
-<ul>
-<li><strong>There is no sharp line between spiky and flat.</strong> In our figure the groups change gradually from sitting on an axis to sitting on a diagonal, and real groups do the same: how spiky a group is runs on a scale.</li>
-<li><strong>A spiky group usually has one weight much larger than the rest.</strong> That weight is called an outlier, and it is what to look for in a real layer.</li>
-<li><strong>In practice we use a heuristic.</strong> Compare the group's largest weight with its overall size, and call the group spiky if that ratio is far bigger than ordinary weights would give.</li>
-<li><strong>Whistle does not try to tell.</strong> The converter applies the same rotation to every group. Whether that is a good bet depends on how many groups are spiky and on how many weights each group has, which is where we are heading.</li>
-</ul>
-
-<details class="detour">
-<summary>Detour: measuring how spiky a group is</summary>
-
-<p>Two numbers are commonly used. For a group of \(n\) weights \(w_1, \dots, w_n\) with length \(\lVert w\rVert\):</p>
-<ul>
-<li><strong>Spikiness</strong> \(s = \dfrac{\max_j |w_j|}{\lVert w\rVert}\): the largest weight as a share of the group's length. It is the quantity on the curves above. It runs from \(1/\sqrt{n}\) (all weights the same size) to 1 (a single weight).</li>
-<li><strong>Crest factor</strong> \(c = \dfrac{\max_j |w_j|}{\mathrm{rms}(w)} = s\sqrt{n}\), where \(\mathrm{rms}(w) = \lVert w\rVert/\sqrt{n}\) is the typical size of a weight. It says how many typical weights the biggest one is worth, so it is easier to compare across group sizes.</li>
-</ul>
-<p>To decide what counts as large, compare with groups of ordinary weights, which behave like Gaussian numbers. Here is what 20,000 random Gaussian groups give:</p>
-<div class="wide"><table>
-<thead><tr><th>Group size \(n\)</th><th class="num">Flat \(s = 1/\sqrt{n}\)</th><th class="num">Typical \(s\): mean</th><th class="num">99th percentile</th><th class="num">Typical \(c\): mean</th><th class="num">99th percentile</th></tr></thead>
-<tbody>
-<tr><td>2</td><td class="num">0.71</td><td class="num">0.90</td><td class="num">1.00</td><td class="num">1.27</td><td class="num">1.41</td></tr>
-<tr><td>8</td><td class="num">0.35</td><td class="num">0.65</td><td class="num">0.89</td><td class="num">1.84</td><td class="num">2.52</td></tr>
-<tr><td>64</td><td class="num">0.125</td><td class="num">0.33</td><td class="num">0.45</td><td class="num">2.61</td><td class="num">3.60</td></tr>
-<tr><td>128</td><td class="num">0.088</td><td class="num">0.25</td><td class="num">0.34</td><td class="num">2.84</td><td class="num">3.89</td></tr>
-</tbody>
-</table></div>
-<p>A reasonable rule of thumb is to say a group of 64 has an outlier if its crest factor is above about 4: a weight more than four times the typical size, rarer than 1 group in 100 among ordinary ones. The threshold is a choice. The useful readout is the share of groups above it, measured layer by layer.</p>
-<ul>
-<li>In two dimensions the crest factor can never exceed \(\sqrt{2}\), so a rule like this has no bite. Our groups are spiky or flat only because of where we placed them.</li>
-<li>With more weights the gap between a flat group and a spike grows, which is why outliers only become a sharp problem for bigger groups.</li>
-</ul>
-</details>
-
-<h4 id="s2-which" data-toc="Which rotation?">Which rotation?</h4>
-
 <details class="detour">
 <summary>Detour: how is this different from PCA?</summary>
 
@@ -462,6 +425,43 @@
 <p>PCA and a flattening rotation do opposite jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so it can help or hurt by chance. When the weights move together (the second), PCA does exactly what compression wants and exactly what rounding does not: it makes every group spikier.</p>
 
 </details>
+
+<h4 id="s2-tell" data-toc="Spiky or flat?">Spiky or flat? Telling them apart</h4>
+
+<p>So a rotation helps spiky groups and hurts flat ones. That raises a natural question: how do we tell which kind a group is?</p>
+<ul>
+<li><strong>There is no sharp line between spiky and flat.</strong> In our figure the groups change gradually from sitting on an axis to sitting on a diagonal, and real groups do the same: how spiky a group is runs on a scale.</li>
+<li><strong>A spiky group usually has one weight much larger than the rest.</strong> That weight is called an outlier, and it is what to look for in a real layer.</li>
+<li><strong>In practice we use a heuristic.</strong> Compare the group's largest weight with its overall size, and call the group spiky if that ratio is far bigger than ordinary weights would give.</li>
+<li><strong>Whistle does not try to tell.</strong> The converter applies the same rotation to every group. Whether that is a good bet depends on how many groups are spiky and on how many weights each group has, which is where we are heading.</li>
+</ul>
+
+<details class="detour">
+<summary>Detour: measuring how spiky a group is</summary>
+
+<p>Two numbers are commonly used. For a group of \(n\) weights \(w_1, \dots, w_n\) with length \(\lVert w\rVert\):</p>
+<ul>
+<li><strong>Spikiness</strong> \(s = \dfrac{\max_j |w_j|}{\lVert w\rVert}\): the largest weight as a share of the group's length. It is the quantity on the curves above. It runs from \(1/\sqrt{n}\) (all weights the same size) to 1 (a single weight).</li>
+<li><strong>Crest factor</strong> \(c = \dfrac{\max_j |w_j|}{\mathrm{rms}(w)} = s\sqrt{n}\), where \(\mathrm{rms}(w) = \lVert w\rVert/\sqrt{n}\) is the typical size of a weight. It says how many typical weights the biggest one is worth, so it is easier to compare across group sizes.</li>
+</ul>
+<p>To decide what counts as large, compare with groups of ordinary weights, which behave like Gaussian numbers. Here is what 20,000 random Gaussian groups give:</p>
+<div class="wide"><table>
+<thead><tr><th>Group size \(n\)</th><th class="num">Flat \(s = 1/\sqrt{n}\)</th><th class="num">Typical \(s\): mean</th><th class="num">99th percentile</th><th class="num">Typical \(c\): mean</th><th class="num">99th percentile</th></tr></thead>
+<tbody>
+<tr><td>2</td><td class="num">0.71</td><td class="num">0.90</td><td class="num">1.00</td><td class="num">1.27</td><td class="num">1.41</td></tr>
+<tr><td>8</td><td class="num">0.35</td><td class="num">0.65</td><td class="num">0.89</td><td class="num">1.84</td><td class="num">2.52</td></tr>
+<tr><td>64</td><td class="num">0.125</td><td class="num">0.33</td><td class="num">0.45</td><td class="num">2.61</td><td class="num">3.60</td></tr>
+<tr><td>128</td><td class="num">0.088</td><td class="num">0.25</td><td class="num">0.34</td><td class="num">2.84</td><td class="num">3.89</td></tr>
+</tbody>
+</table></div>
+<p>A reasonable rule of thumb is to say a group of 64 has an outlier if its crest factor is above about 4: a weight more than four times the typical size, rarer than 1 group in 100 among ordinary ones. The threshold is a choice. The useful readout is the share of groups above it, measured layer by layer.</p>
+<ul>
+<li>In two dimensions the crest factor can never exceed \(\sqrt{2}\), so a rule like this has no bite. Our groups are spiky or flat only because of where we placed them.</li>
+<li>With more weights the gap between a flat group and a spike grows, which is why outliers only become a sharp problem for bigger groups.</li>
+</ul>
+</details>
+
+<h4 id="s2-which" data-toc="Which rotation?">Which rotation?</h4>
 
 <p>Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, because it can be generated by a simple rule: the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. Our groups so far have had two weights, but Whistle's have 64 or 128, so we need such a matrix for bigger groups too. It is a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
 \[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
@@ -779,6 +779,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=72" defer></script>
+    <script src="assets/explainer.js?v=73" defer></script>
   </body>
 </html>
