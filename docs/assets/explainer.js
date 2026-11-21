@@ -9,6 +9,36 @@
   const mathText = (str) => str.split(/(\\\(.*?\\\))/).map((part) => (part.startsWith('\\(') && part.endsWith('\\)') ? tex(part.slice(2, -2)) : esc(part))).join('');
   const setMath = (e, str) => { e.innerHTML = mathText(str); return e; };
   const mel = (tag, cls, str) => setMath(el(tag, cls), str);
+  // Matrices shared by the grouping figure and the 2D figure: weights with each group's scale printed on them, a heatmap of the scales, and a heatmap of the rounding errors
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const sv = (tag, attrs, style) => { const e = document.createElementNS(SVGNS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); if (style) e.style.cssText = style; return e; };
+  const divColor = (v, clip) => `color-mix(in srgb, var(${v >= 0 ? '--sx-red' : '--sx-blue'}) ${Math.min(100, Math.abs(v) / clip * 100)}%, var(--bg))`;   // blue negative, red positive
+  const redColor = (e, clip) => `color-mix(in srgb, var(--sx-red) ${Math.min(100, e / clip * 100)}%, var(--bg))`;                                        // the redder, the larger
+  const goldColor = (v, max) => `color-mix(in srgb, var(--sx-gold) ${Math.max(10, v / max * 100)}%, var(--bg))`;                                        // the more gold, the larger
+  // White lines: between the groups of each row, and (rows) between the rows. R rows of C columns, groups of gs columns, cells CW by RH, shifted right by x0.
+  const gridLines = ({ R, C, CW, RH, gs, x0 = 0, rows }) => {
+    const kids = [], ng = C / gs;
+    if (rows) for (let r = 1; r < R; r++) kids.push(sv('line', { x1: x0, x2: x0 + C * CW, y1: r * RH, y2: r * RH, class: 'gl' }));
+    for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) kids.push(sv('line', { x1: x0 + g * gs * CW, x2: x0 + g * gs * CW, y1: r * RH, y2: (r + 1) * RH, class: 'gl' }));
+    return kids;
+  };
+  // One rectangle per weight. color(r, c) fills it; label(r, g), if given, prints a number on each group; outline(r, c), if given, marks a cell.
+  const matrixCells = ({ R, C, CW, RH, gs, x0 = 0, rows, color, label, outline }) => {
+    const kids = [], ng = C / gs;
+    for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(sv('rect', { x: x0 + c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
+    kids.push(...gridLines({ R, C, CW, RH, gs, x0, rows: rows === undefined ? ng > 1 : rows }));
+    if (outline) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outline(r, c)) kids.push(sv('rect', { x: x0 + c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
+    if (label) for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) { const t = sv('text', { x: x0 + (g + .5) * gs * CW, y: r * RH + RH * .5, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gv' }); t.textContent = label(r, g); kids.push(t); }
+    return kids;
+  };
+  // One block per group, as wide as the group: for the heatmap of the scales. color(r, g) fills it.
+  const matrixGroups = ({ R, C, CW, RH, gs, x0 = 0, rows, color }) => {
+    const kids = [], ng = C / gs;
+    for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) kids.push(sv('rect', { x: x0 + g * gs * CW, y: r * RH, width: gs * CW + .4, height: RH + .4 }, `fill:${color(r, g)}`));
+    kids.push(...gridLines({ R, C, CW, RH, gs, x0, rows: rows === undefined ? ng > 1 : rows }));
+    return kids;
+  };
+
   const press = (buttons, on) => buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === on)));
 
   // Jacobi rotations for a small symmetric matrix: eigenvectors (biggest eigenvalue first) and eigenvalues
@@ -351,6 +381,15 @@
       svg.replaceChildren(...kids);
       const pc = (v) => (v * 100).toFixed(0) + '%', e45 = had ? `, ${pc(curve[45])} at 45°` : '', r45 = had ? `, ${pc(avg(45))} at 45°` : '';
       note.textContent = `Rotated ${state.deg}°. Group ${state.sel + 1}: (${sel[0].toFixed(2)}, ${sel[1].toFixed(2)}), largest coordinate ${pc(m)} of its length, rounding error ${pc(err)}. Average over the ${pts.length} group${pts.length > 1 ? 's' : ''}: largest weight ${pc(curve[state.deg])} of the length (${pc(curve[0])} before rotating${e45}), rounding error ${pc(avg(state.deg))} (${pc(avg(0))} before${r45}). ${state.mode === 'plain' ? 'Each group has its own square, reaching its largest weight.' : 'Every group shares the one fixed grid.'}`;
+      const tw = $(fig, '[data-v=tw]');
+      if (tw) {                                          // the groups as a matrix: one row per group, two weights each, following the rotation
+        const N = pts.length, CW2 = 84, RH2 = 38, x0 = 34, sc = Q.map((o) => (state.mode === 'plain' ? o.m : 1)), smax = Math.max(...sc), base2 = { R: N, C: 2, CW: CW2, RH: RH2, gs: 2, rows: true };
+        const chips = P.flatMap((p, i) => { const g = sv('circle', { cx: 14, cy: i * RH2 + RH2 / 2, r: 12 }, `fill:${col(i)}`), t = sv('text', { x: 14, y: i * RH2 + RH2 / 2, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gnum2' }); t.textContent = i + 1; return [g, t]; });
+        const put = (svgEl, w, kids) => { svgEl.setAttribute('viewBox', `0 0 ${w} ${N * RH2}`); svgEl.style.width = w + 'px'; svgEl.replaceChildren(...kids); };
+        put(tw, x0 + 2 * CW2, [...chips, ...matrixCells({ ...base2, x0, color: (r, c) => divColor(P[r][c], 1), label: (r) => sc[r].toFixed(2) })]);
+        put($(fig, '[data-v=ts]'), CW2, matrixGroups({ R: N, C: 1, CW: CW2, RH: RH2, gs: 1, rows: true, color: (r) => goldColor(sc[r], smax) }));
+        put($(fig, '[data-v=te]'), 2 * CW2, matrixCells({ ...base2, color: (r, c) => redColor(Math.abs(P[r][c] - Q[r].q[c]), .5) }));
+      }
       const box = $(fig, '.sx-mat');
       if (box) {
         const c = Math.cos(state.deg * Math.PI / 180), sn = Math.sin(state.deg * Math.PI / 180), h = Math.SQRT1_2;
@@ -735,29 +774,11 @@
       const gs = SIZES[state.g], ng = C / gs, st = stats(gs); cur = st; curGs = gs;
       $(fig, '[data-o=g]').textContent = `${ng} of ${gs}`;
       let gm = 0; for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) gm = Math.max(gm, Math.abs(val(r, c)));
-      const cells = (svg, h, color, labels) => {
-        const kids = [];
-        for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(mk('rect', { x: c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
-        if (ng > 1) {                                       // white lines between rows, so each row is its own strip of groups
-          for (let r = 1; r < R; r++) kids.push(mk('line', { x1: 0, x2: C * CW, y1: r * RH, y2: r * RH, class: 'gl' }));
-          for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH, y2: (r + 1) * RH, class: 'gl' }));
-        }
-        if (state.out) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outl[r][c]) kids.push(mk('rect', { x: c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
-        if (labels) for (let r = 0; r < R; r++) st.scales[r].forEach((sc, g) => { const t = mk('text', { x: (g + .5) * gs * CW, y: r * RH + RH * .5, 'text-anchor': 'middle', 'dominant-baseline': 'central', class: 'gv' }); t.textContent = sc.mx.toFixed(1); kids.push(t); });   // each group's scale, on its cells
-        return kids;
-      };
-      const wcol = (r, c) => { const v = val(r, c), p = Math.min(100, Math.abs(v) / 3 * 100); return `color-mix(in srgb, var(${v >= 0 ? '--sx-red' : '--sx-blue'}) ${p}%, var(--bg))`; };
-      const ecol = (r, c) => `color-mix(in srgb, var(--sx-red) ${Math.min(100, st.err[r][c] / .5 * 100)}%, var(--bg))`;
-      const scol = (r, g) => `color-mix(in srgb, var(--sx-gold) ${Math.max(10, st.scales[r][g].mx / gm * 100)}%, var(--bg))`;
-      const skids = [];
-      for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) skids.push(mk('rect', { x: g * gs * CW, y: r * RH, width: gs * CW + .4, height: RH + .4 }, `fill:${scol(r, g)}`));
-      if (ng > 1) {
-        for (let r = 1; r < R; r++) skids.push(mk('line', { x1: 0, x2: C * CW, y1: r * RH, y2: r * RH, class: 'gl' }));
-        for (let r = 0; r < R; r++) for (let g = 1; g < ng; g++) skids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: r * RH, y2: (r + 1) * RH, class: 'gl' }));
-      }
-      wsvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); wsvg.replaceChildren(...cells(wsvg, R * RH, wcol, true));
-      ssvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); ssvg.replaceChildren(...skids);
-      esvg.setAttribute('viewBox', `0 0 ${C * CW} ${R * RH}`); esvg.replaceChildren(...cells(esvg, R * RH, ecol));
+      const common = { R, C, CW, RH, gs };
+      const vb = `0 0 ${C * CW} ${R * RH}`;
+      wsvg.setAttribute('viewBox', vb); wsvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => divColor(val(r, c), 3), outline: (r, c) => state.out && outl[r][c], label: (r, g) => st.scales[r][g].mx.toFixed(1) }));
+      ssvg.setAttribute('viewBox', vb); ssvg.replaceChildren(...matrixGroups({ ...common, color: (r, g) => goldColor(st.scales[r][g].mx, gm) }));
+      esvg.setAttribute('viewBox', vb); esvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => redColor(st.err[r][c], .5), outline: (r, c) => state.out && outl[r][c] }));
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
       setMath(store, `Storage per row: \\(${C}\\times 4 = ${idx}\\) bits for the indices, plus \\(${ng}\\times 32 = ${scl}\\) bits for the scale${ng > 1 ? 's' : ''}, \\(${st.rowBits}\\) bits in all (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`);

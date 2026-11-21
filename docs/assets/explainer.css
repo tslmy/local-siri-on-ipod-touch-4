@@ -279,3 +279,12 @@
 .sx-r2 .gd { opacity: .55; }
 .sx-r2 .pt.sel { stroke: var(--text); }
 .sx-r2 .gnum { font-weight: bold; font-size: 12px; pointer-events: none; }
+
+/* The three matrices inside the 2D figure */
+.sx-trip { display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: flex-start; margin: .5rem 0 .9rem; }
+.sx-tcol { flex: 0 0 auto; max-width: 14rem; }
+.sx-trip .sx-gr { width: auto; max-width: 100%; height: auto; }
+.sx-trip .gv { font-size: 15px; stroke-width: 3px; }
+.sx-trip .gl { stroke-width: .9; }
+.sx-trip .gnum2 { fill: var(--bg); font: bold 14px var(--sx-sans); }
+.sx-tcol .sx-hint { margin: .3rem 0 0; }
