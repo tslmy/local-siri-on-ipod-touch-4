@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
-    <link rel="stylesheet" href="assets/explainer.css?v=33" />
+    <link rel="stylesheet" href="assets/explainer.css?v=34" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -302,7 +302,7 @@
 <li>But you can change the axes you write them against.</li>
 </ul>
 
-<p>Start with the smallest case: a group of just two weights, drawn as a point on a plane. This is also the one size where the Hadamard matrix is small enough to draw exactly:</p>
+<p>Start with the smallest case: a group of just two weights, drawn as a point on a plane:</p>
 <ul>
 <li>The 2-bit levels, four per axis, form a grid inside a square that just reaches the point's largest coordinate.</li>
 <li>A point close to an axis has one big weight and one tiny one, so its square must be as large as the point is long, and the grid is coarse.</li>
@@ -313,8 +313,8 @@
   <figcaption><strong>Rotating groups of two weights.</strong> Each dot is one group of two weights, drawn as a point on a circle of length 1 (the group's length is divided out, as in step 1), and each group has its own color. Hollow dots mark where the groups started, and filled dots are where the rotation has taken them. First, make up some groups:</figcaption>
   <div class="sx-rowlabel sx-block">Mock groups</div>
   <div class="sx-opts">
-    <button data-at="axes" aria-pressed="true"><strong>One big weight each</strong><span>A big weight and a small one, so a group starts near an axis.</span></button>
-    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each</strong><span>Two weights of about the same size, so a group starts near a diagonal.</span></button>
+    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one, so a group starts near an axis.</span></button>
+    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size, so a group starts near a diagonal.</span></button>
   </div>
   <div class="sx-controls">
     <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
@@ -328,26 +328,16 @@
     <button data-mode="plain" aria-pressed="true"><strong>Reach each group's largest weight</strong><span>Step 1: every group has its own scale, so each gets its own square in its own color, drawn to just reach its largest coordinate, with the evenly spaced levels of plain quantization.</span></button>
     <button data-mode="fixed" aria-pressed="false"><strong>One fixed grid for all groups</strong><span>Step 3's idea: the length is divided out and one grid (a single gold square) is shared by every group, here sized for a perfectly flat group (both coordinates 0.71). Whistle's grid is fixed too, but Gaussian-shaped and built for groups of 64.</span></button>
   </div>
-  <p class="sx-cap2">The curve shows, at every angle, the largest weight as a share of the group's length, averaged over the dots. Lower is flatter, and the rounding error follows it. The gold line marks 45°, the 2×2 Hadamard matrix. Now rotate:</p>
+  <p class="sx-cap2">The curve shows, at every angle, the largest weight as a share of the group's length, averaged over the groups. Lower is flatter, and the rounding error follows it. Now rotate. The camera switch changes the viewpoint: off, the camera stays with the axes and the points move; on, it stays with the points, and the axes and squares turn the other way.</p>
   <div class="sx-rowlabel sx-block">Rotation</div>
   <div class="sx-controls">
     <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
-    <button data-act="had">45° (Hadamard)</button>
     <button data-act="reset">reset</button>
+    <button data-act="follow" aria-pressed="false">camera follows the points</button>
   </div>
   <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Points on a circle with the square of quantization levels around the selected point, and a curve of average rounding error against rotation angle"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
-  <div class="sx-mat"></div>
-  <p class="sx-note">In two dimensions the match is exact: the Hadamard matrix is the 45° rotation with its two outputs swapped. Swapping outputs does not change the rounding error, because the grid is the same either way. As before, the rotation slider is only an animation: Whistle applies the matrix once, all at once.</p>
-  <div class="callout">
-    <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and it is worth being clear which:
-    <ul>
-    <li><strong>Groups with one big weight, which start near an axis.</strong> They are as far from 45° as possible, so turning by 45° brings them to the flat direction. That is the "one big weight each" setting at 100% above.</li>
-    <li><strong>Not groups that start near a diagonal.</strong> Switch to "two similar weights each" and the curve flips: they are already flat, and 45° turns them into spikes.</li>
-    <li><strong>Not groups spread evenly in every direction.</strong> The curve is nearly flat and no angle helps on average.</li>
-    </ul>
-    With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
-  </div>
+  <p class="sx-note">The rotation slider is only an animation: in practice a rotation is applied once, all at once.</p>
 </figure>
 
 <p>With three weights, the same picture is a point in 3D space, one weight per axis:</p>
@@ -376,7 +366,7 @@
   <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="Four points in three dimensions with the cube of quantization levels around the selected point"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
   <div class="sx-mat"></div>
-  <p class="sx-note">The slider is only an animation. Whistle applies one fixed matrix, all at once, to every group: there is no angle to choose. No 3×3 Hadamard matrix exists, but at 60° the rotation matrix has the flattest entries a 3×3 rotation can have, ±2/3 and ±1/3, which is the closest 3D stand-in.</p>
+  <p class="sx-note">The slider is only an animation: in practice a rotation is applied once, all at once. At 60° the rotation matrix has the flattest entries a 3×3 rotation can have, ±2/3 and ±1/3.</p>
 </figure>
 
 <p>Why this is safe:</p>
@@ -384,19 +374,58 @@
 <li><strong>Nothing is lost.</strong> A rotation keeps every point's length and can be undone exactly by rotating back, so the rounding error is the same size whichever side you measure it on.</li>
 <li><strong>It costs no bits.</strong> There is nothing extra to store.</li>
 </ul>
-<p>And how much it flattens depends on how many weights share the rotation. A lone spike of any size ends up, after a Hadamard rotation, equally spread over all \(n\) outputs, so each output holds \(1/\sqrt{n}\) of its length:</p>
-\[ \frac{\text{largest coordinate}}{\text{length}} \;=\; \frac{1}{\sqrt{n}} \]
+<details class="detour">
+<summary>Detour: how is this different from PCA?</summary>
+
+<p>If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar. PCA is also a rotation, but with the opposite goal:</p>
 <div class="wide"><table>
-<thead><tr><th>Weights in the group</th><th class="num">Largest coordinate after rotating a lone spike</th></tr></thead>
+<thead><tr><th></th><th>PCA</th><th>Hadamard matrix (introduced right after this detour)</th></tr></thead>
 <tbody>
-<tr><td>1 (nothing to spread over)</td><td class="num">100% of the length</td></tr>
-<tr><td>3 (the figure above reaches about two thirds for all three axes at once)</td><td class="num">at best 58%</td></tr>
-<tr><td>8</td><td class="num">35%</td></tr>
-<tr><td>64</td><td class="num">12.5% (1/8)</td></tr>
-<tr><td>128</td><td class="num">8.8%</td></tr>
+<tr><td>Chosen from</td><td>The data: the directions many vectors vary along most</td><td>Nothing, it is fixed</td></tr>
+<tr><td>Effect</td><td>Piles the energy into a few coordinates</td><td>Spreads the energy evenly over all coordinates</td></tr>
+<tr><td>Good for</td><td>Compressing by dropping the small coordinates</td><td>Rounding, where a dominant coordinate is the outlier we want to avoid</td></tr>
+<tr><td>Needs</td><td>A rotation fitted to each layer's data, and stored</td><td>No stored matrix</td></tr>
+<tr><td>Fast form</td><td>A general matrix multiply</td><td>Add-and-subtract butterfly (step 4)</td></tr>
 </tbody>
 </table></div>
-<p>Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
+<p>Here are both, applied to the same 24 groups of 8 weights. The second rotation is the Hadamard matrix:</p>
+
+<figure class="widget wide" data-widget="pca">
+  <figcaption><strong>PCA and the Hadamard rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
+  <div class="sx-controls">
+    <span class="sx-seg"><button data-ds="spiky" aria-pressed="true">each group has one big weight</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
+    <button data-act="new">new data</button>
+  </div>
+  <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after the Hadamard rotation, with the energy per coordinate below each"></svg>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Here is the same contrast in three dimensions, where you can watch it happen:</p>
+<ul>
+<li>Each dot is a group of three weights, red when its 2-bit rounding error is large and blue when it is small.</li>
+<li>The flattening rotation is the 60° turn about the diagonal from the figure above.</li>
+<li>Choose a data set and a rotation, then drag the slider from 0 to 100% of that rotation. "Spin the view" turns the camera so you can see the cloud from all sides.</li>
+</ul>
+
+<figure class="widget wide" data-widget="pca3d">
+  <figcaption><strong>PCA and a flattening rotation, in 3D.</strong> Gold dashed lines are the cloud's principal axes, the directions PCA turns into the coordinate axes. The readout gives the average rounding error and how the energy is divided among the three coordinates. Drag the background to look around.</figcaption>
+  <div class="sx-controls">
+    <span class="sx-seg"><button data-ds="axes" aria-pressed="true">spikes along the axes</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
+    <span class="sx-seg"><button data-rot="pca" aria-pressed="true">PCA rotation</button><button data-rot="diag" aria-pressed="false">flattening rotation</button></span>
+    <label>Rotate <input type="range" min="0" max="100" step="1" value="0" data-k="t"> <output data-o="t"></output></label>
+    <button data-act="new">new data</button>
+    <button data-act="spin" aria-pressed="false">spin the view</button>
+  </div>
+  <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="A cloud of points in three dimensions that rotates by PCA or by a flattening rotation, coloured by rounding error"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+  <p class="sx-note">The slider is only an animation. A real PCA step applies one matrix, fitted to the data, all at once. The flattening rotation is the 60° one from the figure above.</p>
+</figure>
+
+<p>Neither rotation is better in general; they are tools for different jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so a PCA rotation can help or hurt by chance. When the weights move together (the second), PCA is exactly the wrong tool for rounding: it makes every group spikier.</p>
+
+</details>
+
+<p><strong>Which rotation?</strong> Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
 \[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
 Each bigger one is four copies of the previous one, with the bottom-right copy negated:
 \[ H_{2n} = \frac{1}{\sqrt{2}}\begin{bmatrix} H_n & H_n \\ H_n & -H_n \end{bmatrix} \]
@@ -430,56 +459,68 @@ Here are the entries of these matrices, before the scaling:</p>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<details class="detour">
-<summary>Detour: how is this different from PCA?</summary>
+<p><strong>Why and when the Hadamard matrix flattens best.</strong> The figures above showed that rotating a spiky group can help. Here is what makes the Hadamard rotation the one to use, and when it works.</p>
 
-<p>If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar. PCA is also a rotation, but with the opposite goal:</p>
+<p>Why: a lone spike of any size ends up, after a Hadamard rotation, equally spread over all \(n\) outputs, so each output holds \(1/\sqrt{n}\) of its length. The more weights share the rotation, the flatter it gets:</p>
+\[ \frac{\text{largest coordinate}}{\text{length}} \;=\; \frac{1}{\sqrt{n}} \]
 <div class="wide"><table>
-<thead><tr><th></th><th>PCA</th><th>Hadamard (here)</th></tr></thead>
+<thead><tr><th>Weights in the group</th><th class="num">Largest coordinate after rotating a lone spike</th></tr></thead>
 <tbody>
-<tr><td>Chosen from</td><td>The data: the directions many vectors vary along most</td><td>Nothing, it is fixed</td></tr>
-<tr><td>Effect</td><td>Piles the energy into a few coordinates</td><td>Spreads the energy evenly over all coordinates</td></tr>
-<tr><td>Good for</td><td>Compressing by dropping the small coordinates</td><td>Rounding, where a dominant coordinate is the outlier we want to avoid</td></tr>
-<tr><td>Needs</td><td>A rotation fitted to each layer's data, and stored</td><td>No stored matrix</td></tr>
-<tr><td>Fast form</td><td>A general matrix multiply</td><td>Add-and-subtract butterfly (step 4)</td></tr>
+<tr><td>1 (nothing to spread over)</td><td class="num">100% of the length</td></tr>
+<tr><td>3 (the 3D figure reaches about two thirds for all three axes at once)</td><td class="num">at best 58%</td></tr>
+<tr><td>8</td><td class="num">35%</td></tr>
+<tr><td>64</td><td class="num">12.5% (1/8)</td></tr>
+<tr><td>128</td><td class="num">8.8%</td></tr>
 </tbody>
 </table></div>
-<p>Here are both, applied to the same 24 groups of 8 weights:</p>
+<p>In two dimensions the Hadamard matrix is exactly the 45° rotation with its two outputs swapped, so the 2D picture shows when it helps. This is the same figure as before, with that angle marked:</p>
 
-<figure class="widget wide" data-widget="pca">
-  <figcaption><strong>PCA and the Hadamard rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
-  <div class="sx-controls">
-    <span class="sx-seg"><button data-ds="spiky" aria-pressed="true">each group has one big weight</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
-    <button data-act="new">new data</button>
+<figure class="widget wide" data-widget="rot2d" data-had="1">
+  <figcaption><strong>The Hadamard angle.</strong> The same two-weight groups as before, now with the Hadamard matrix marked on the curve and shown next to the rotation matrix. Make up some groups, then rotate:</figcaption>
+  <div class="sx-rowlabel sx-block">Mock groups</div>
+  <div class="sx-opts">
+    <button data-at="axes" aria-pressed="true"><strong>One big weight each (i.e., has outlier)</strong><span>A big weight and a small one, so a group starts near an axis.</span></button>
+    <button data-at="diag" aria-pressed="false"><strong>Two similar weights each (i.e., no outlier)</strong><span>Two weights of about the same size, so a group starts near a diagonal.</span></button>
   </div>
-  <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after the Hadamard rotation, with the energy per coordinate below each"></svg>
-  <p class="sx-note" aria-live="polite">&nbsp;</p>
-</figure>
-
-<p>Here is the same contrast in three dimensions, where you can watch it happen:</p>
-<ul>
-<li>Each dot is a group of three weights, red when its 2-bit rounding error is large and blue when it is small.</li>
-<li>There is no 3×3 Hadamard matrix (they exist for sizes 1, 2, 4, 8 and so on), so the flattening rotation is the 60° turn about the diagonal from the figure above, standing in for it.</li>
-<li>Choose a data set and a rotation, then drag the slider from 0 to 100% of that rotation. "Spin the view" turns the camera so you can see the cloud from all sides.</li>
-</ul>
-
-<figure class="widget wide" data-widget="pca3d">
-  <figcaption><strong>PCA and a flattening rotation, in 3D.</strong> Gold dashed lines are the cloud's principal axes, the directions PCA turns into the coordinate axes. The readout gives the average rounding error and how the energy is divided among the three coordinates. Drag the background to look around.</figcaption>
   <div class="sx-controls">
-    <span class="sx-seg"><button data-ds="axes" aria-pressed="true">spikes along the axes</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
-    <span class="sx-seg"><button data-rot="pca" aria-pressed="true">PCA rotation</button><button data-rot="diag" aria-pressed="false">flattening rotation</button></span>
-    <label>Rotate <input type="range" min="0" max="100" step="1" value="0" data-k="t"> <output data-o="t"></output></label>
-    <button data-act="new">new data</button>
-    <button data-act="spin" aria-pressed="false">spin the view</button>
+    <label>Number of groups <input type="range" min="1" max="8" step="1" value="3" data-k="n"> <output data-o="n"></output></label>
+    <label>Spiky groups <input type="range" min="0" max="100" step="1" value="100" data-k="sp"> <output data-o="sp"></output></label>
+    <button data-act="new">new points</button>
   </div>
-  <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="A cloud of points in three dimensions that rotates by PCA or by a flattening rotation, coloured by rounding error"></svg>
+  <div class="sx-rowlabel sx-block">Rotation</div>
+  <div class="sx-controls">
+    <label>Angle <input type="range" min="0" max="90" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
+    <button data-act="had">45° (Hadamard)</button>
+    <button data-act="reset">reset</button>
+    <button data-act="follow" aria-pressed="false">camera follows the points</button>
+  </div>
+  <svg class="sx-r2" viewBox="0 0 640 300" role="img" aria-label="Points on a circle with the square of quantization levels around each group, and a curve of average spikiness against rotation angle with the Hadamard angle marked"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
-  <p class="sx-note">The slider is only an animation. A real PCA step applies one matrix, fitted to the data, all at once. The flattening rotation is the 60° one from the figure above, standing in for the Hadamard matrix.</p>
+  <div class="sx-mat"></div>
+  <p class="sx-note">In two dimensions the match is exact: the Hadamard matrix is the 45° rotation with its two outputs swapped. Swapping outputs does not change the rounding error, because the grid is the same either way.</p>
+  <div class="callout">
+    <strong>When does 45° (the Hadamard matrix) give the least spikiness?</strong> Only for certain groups, and it is worth being clear which:
+    <ul>
+    <li><strong>Groups with one big weight (an outlier), which start near an axis.</strong> They are as far from 45° as possible, so turning by 45° brings them to the flat direction. That is the first mock-group setting at 100%.</li>
+    <li><strong>Not groups that start near a diagonal.</strong> Switch to "Two similar weights each" and the curve flips: they are already flat, and 45° turns them into spikes.</li>
+    <li><strong>Not groups spread evenly in every direction.</strong> The curve is nearly flat and no angle helps on average.</li>
+    </ul>
+    With 64 weights the same holds. A single big weight is a spike along one axis, and the Hadamard matrix spreads it evenly over all 64 outputs. The groups it makes spikier are the ones that already look like one of its rows: a group whose 64 weights are all equal becomes a single spike. Weights with one large outlier are far more common than that, which is why Whistle uses it.
+  </div>
+
 </figure>
 
-<p>Neither rotation is better in general; they are tools for different jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so a PCA rotation can help or hurt by chance. When the weights move together (the second), PCA is exactly the wrong tool for rounding: it makes every group spikier.</p>
-
-</details>
+<p>For other group sizes the flattest a rotation can be is set by the length: each row of the matrix has length 1, so its largest entry is at least \(1/\sqrt{n}\). The Hadamard matrix reaches that bound whenever it exists:</p>
+<div class="wide"><table>
+<thead><tr><th>Group size \(n\)</th><th class="num">Smallest largest entry</th><th>Which matrix gets there</th></tr></thead>
+<tbody>
+<tr><td>2</td><td class="num">0.71</td><td>The Hadamard matrix, exactly: the 45° rotation above</td></tr>
+<tr><td>3</td><td class="num">0.67</td><td>No Hadamard matrix of this size exists. The 60° rotation from the 3D figure is the flattest we found (a numerical search agrees)</td></tr>
+<tr><td>4</td><td class="num">0.5</td><td>The 4×4 Hadamard matrix</td></tr>
+<tr><td>8</td><td class="num">0.35</td><td>The 8×8 Hadamard matrix</td></tr>
+<tr><td>64</td><td class="num">0.125</td><td>The 64×64 Hadamard matrix, which is why groups of 64 (or 128) are a natural size</td></tr>
+</tbody>
+</table></div>
 
 <p><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 <ul>
@@ -634,6 +675,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=33" defer></script>
+    <script src="assets/explainer.js?v=34" defer></script>
   </body>
 </html>
