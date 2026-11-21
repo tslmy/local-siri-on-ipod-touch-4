@@ -630,10 +630,27 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat the savings.</p>
 
-<p>Start with the shape of the values. Each rotated weight is a mix of all the weights in its group, so by the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a> the values pile up in a bell curve: most near zero, few in the tails. Here are the real weights of SmolLM2, counted before and after rotating each group. Each group is first divided by its length, so that every group is measured on the same scale:</p>
+<p>Start with the shape of the values. Trained weights are usually roughly bell-shaped, as one would expect: they start out as random Gaussian numbers, and training adds up many small nudges. Here are the real weights of SmolLM2. Each group is first divided by its length, so that every group is measured on the same scale:</p>
+
+<figure class="widget wide" data-widget="hist" data-mode="single">
+  <figcaption><strong>SmolLM2's weights as a histogram.</strong> Each bar counts the weights in a narrow range of values, measured in standard deviations (σ) after dividing each group by its length. The dashed curve is an ideal bell curve.</figcaption>
+  <div class="sx-controls">
+    <span class="sx-seg" role="group" aria-label="Which weights"><button data-cls="all" aria-pressed="true">all layers</button><button data-cls="attention" aria-pressed="false">attention</button><button data-cls="mlp" aria-pressed="false">feed-forward</button><button data-cls="embedding" aria-pressed="false">embedding</button></span>
+    <label>Weights per group <input type="range" min="0" max="3" step="1" value="3" data-k="g"> <output data-o="g"></output></label>
+  </div>
+  <svg class="sx-ol" viewBox="0 0 640 200" role="img" aria-label="Histogram of SmolLM2's weights after dividing each group by its length, with a bell curve drawn over it"></svg>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>For groups of 64, the attention and feed-forward weights come close to a bell curve, with a kurtosis of 3.2 and 3.1 (a bell curve has 3). Dividing by the group's length does much of the work.<span class="sidenote-wrap"><label for="sn-4" class="sidenote-number"></label><input type="checkbox" id="sn-4" class="sidenote-toggle"><span class="sidenote">The embedding is the exception, with a kurtosis of 5.2: a sharper peak and longer tails.</span></span></p>
+
+<details class="detour">
+<summary>Detour: does the rotation make them even more bell-shaped?</summary>
+
+<p>As one would expect, yes. Each rotated weight is a mix of all the weights in its group, so by the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a> the values pile up in a bell curve even when the originals do not. Here are the same weights before and after rotating each group:</p>
 
 <figure class="widget wide" data-widget="hist">
-  <figcaption><strong>SmolLM2's weights, before and after rotation.</strong> Each bar counts the weights in a narrow range of values, measured in standard deviations (σ) after dividing each group by its length. The same weights appear in both panels; the right one has each group multiplied by the Hadamard matrix. The dashed curve is an ideal bell curve. Switch on the log scale to see the tails, where the counts are tiny, or switch off the division to see what the groups' different sizes do.</figcaption>
+  <figcaption><strong>SmolLM2's weights, before and after rotation.</strong> The same weights appear in both panels; the right one has each group multiplied by the Hadamard matrix. Switch on the log scale to see the tails, where the counts are tiny, or switch off the division to see what the groups' different sizes do.</figcaption>
   <div class="sx-controls">
     <span class="sx-seg" role="group" aria-label="Which weights"><button data-cls="all" aria-pressed="true">all layers</button><button data-cls="attention" aria-pressed="false">attention</button><button data-cls="mlp" aria-pressed="false">feed-forward</button><button data-cls="embedding" aria-pressed="false">embedding</button></span>
     <label>Weights per group <input type="range" min="0" max="3" step="1" value="3" data-k="g"> <output data-o="g"></output></label>
@@ -645,13 +662,14 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
   <table class="sx-stat"></table>
 </figure>
 
-<p>What the real weights show, for groups of 64:</p>
+<p>For groups of 64:</p>
 <ul>
-<li><strong>They are already close to a bell curve</strong> in the attention and feed-forward layers, with a kurtosis of 3.2 and 3.1 (a bell curve has 3). Dividing by the group's length does much of the work.<span class="sidenote-wrap"><label for="sn-4" class="sidenote-number"></label><input type="checkbox" id="sn-4" class="sidenote-toggle"><span class="sidenote">The embedding is the exception, with a kurtosis of 5.2: a sharper peak and longer tails.</span></span></li>
 <li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9, which is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
+<li><strong>It helps most where the weights are least bell-shaped.</strong> The embedding goes from a kurtosis of 5.2 to 2.9. The same holds for groups with an outlier, as in the toy examples earlier. So the rotation is less a source of the bell shape than a guarantee of it.</li>
 <li><strong>Without dividing by the length, the picture is much worse.</strong> Groups differ a lot in size, so the values are a mixture of many bell curves of different widths, which has heavy tails (kurtosis 5.4, largest value 51σ). Rotating helps (3.7, 25σ) but cannot make the groups alike: it mixes the weights inside a group and leaves the group's size alone. That is why the length is divided out first, and stored as the scale.</li>
 <li><strong>Small groups show little.</strong> In a group of 8 no value can exceed \(\sqrt{8} = 2.8\sigma\), so there are no tails to trim. Slide the group size up to see the effect grow.</li>
 </ul>
+</details>
 
 <p>That shape is what the next steps rely on:</p>
 <ul>
@@ -878,6 +896,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=91" defer></script>
+    <script src="assets/explainer.js?v=92" defer></script>
   </body>
 </html>

@@ -1022,19 +1022,19 @@
     const D = window.WEIGHT_HIST, svg = $(fig, 'svg'), note = $(fig, '.sx-note');
     if (!D) { note.textContent = 'The weight statistics did not load.'; return; }
     const SIZES = [8, 16, 32, 64], LABEL = { all: 'all layers', attention: 'attention layers', mlp: 'feed-forward layers', embedding: 'embedding' };
-    const st = { cls: 'all', g: 3, log: false, norm: true };
+    const st = { cls: 'all', g: 3, log: false, norm: true }, single = fig.dataset.mode === 'single', opt = (k) => fig.querySelector(`[data-k=${k}]`);
     const txt = (x, y, str, anchor, cls) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
     const draw = () => {
       const G = SIZES[st.g], e = D.data[`${st.cls}/${G}`], d = st.norm ? e : { ...e, before: e.rawbefore, after: e.rawafter, kurt: e.rawkurt, beyond3: e.rawbeyond3, max: e.rawmax }, NB = D.bins.n, bw = D.bins.width, xm = -D.bins.lo, n = d.n;
       $(fig, '[data-o=g]').textContent = G;
       fig.querySelectorAll('[data-cls]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cls === st.cls)));
-      $(fig, '[data-k=log]').setAttribute('aria-pressed', String(st.log)); $(fig, '[data-k=norm]').setAttribute('aria-pressed', String(st.norm));
+      opt('log') && opt('log').setAttribute('aria-pressed', String(st.log)); opt('norm') && opt('norm').setAttribute('aria-pressed', String(st.norm));
       const dens = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
-      const top = Math.max(...d.before, ...d.after, n * bw * dens(0)) * 1.08;
+      const top = Math.max(...d.before, ...(single ? [] : d.after), n * bw * dens(0)) * 1.08;
       const T = (k) => (st.log ? Math.log10(1 + k) / Math.log10(1 + top) : k / top);
-      const kids = [], W = 296, H = 130, Y0 = 36, cw = (W - 16) / NB;
-      [['Before rotation', d.before, 'var(--sx-blue)'], ['After rotating each group', d.after, 'var(--sx-gold)']].forEach(([title, c, color], p) => {
-        const ox = p * 324, X = (v) => ox + 8 + (W - 16) * (v + xm) / (2 * xm), Y = (k) => Y0 + H - H * T(k);
+      const kids = [], W = single ? 456 : 296, H = single ? 140 : 130, Y0 = 36, cw = (W - 16) / NB;
+      (single ? [['Weights divided by their group\'s length', d.before, 'var(--sx-blue)']] : [['Before rotation', d.before, 'var(--sx-blue)'], ['After rotating each group', d.after, 'var(--sx-gold)']]).forEach(([title, c, color], p) => {
+        const ox = single ? 92 : p * 324, X = (v) => ox + 8 + (W - 16) * (v + xm) / (2 * xm), Y = (k) => Y0 + H - H * T(k);
         kids.push(txt(ox + W / 2, 16, title, 'middle', 'lbl rowname'));
         c.forEach((k, i) => { if (!k) return; const h = Math.max(1, H * T(k)); kids.push(sv('rect', { x: ox + 8 + cw * i + .2, y: Y0 + H - h, width: cw - .4, height: h }, `fill:${color};opacity:.85`)); });
         const pts = []; for (let i = 0; i <= 120; i++) { const z = -xm + 2 * xm * i / 120; pts.push(`${X(z).toFixed(1)},${Y(n * bw * dens(z)).toFixed(1)}`); }
@@ -1045,13 +1045,14 @@
       svg.replaceChildren(...kids);
       const f = (v) => v.toFixed(v < 10 ? 1 : 0);
       note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G}: ${(n / 1e6).toFixed(0)} million weights. ` + (st.norm ? `A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.` : 'Only each whole matrix is scaled here, so groups keep their own sizes, and values beyond ±6σ are counted in the end bars.');
+      if (single) { note.textContent += ` Kurtosis (3 for a bell curve): ${d.kurt[0].toFixed(2)}. Weights beyond 3σ (0.27% for a bell curve): ${d.beyond3[0]}%.`; return; }
       const rows = [['', 'Before rotation', 'After rotation', 'Ideal bell curve'], ['Kurtosis (a measure of how heavy the tails are)', d.kurt[0].toFixed(2), d.kurt[1].toFixed(2), '3'], ['Weights beyond 3σ', d.beyond3[0] + '%', d.beyond3[1] + '%', '0.27%'], ['Largest value', f(d.max[0]) + 'σ', f(d.max[1]) + 'σ', '']];
       $(fig, '.sx-stat').replaceChildren(...rows.map((r, i) => { const tr = el('tr'); r.forEach((t, j) => tr.append(el(i ? (j ? 'td' : 'th') : 'th', j ? 'num' : null, t))); return tr; }));
     };
     fig.querySelectorAll('[data-cls]').forEach((b) => b.addEventListener('click', () => { st.cls = b.dataset.cls; draw(); }));
     $(fig, '[data-k=g]').addEventListener('input', (e) => { st.g = +e.target.value; draw(); });
-    $(fig, '[data-k=log]').addEventListener('click', () => { st.log = !st.log; draw(); });
-    $(fig, '[data-k=norm]').addEventListener('click', () => { st.norm = !st.norm; draw(); });
+    opt('log') && opt('log').addEventListener('click', () => { st.log = !st.log; draw(); });
+    opt('norm') && opt('norm').addEventListener('click', () => { st.norm = !st.norm; draw(); });
     draw();
   };
 
