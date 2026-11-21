@@ -431,10 +431,10 @@
           kids.push(sv('path', { d: path, class: 'arc' }, `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
         });
       }
-      const bin = (k) => k.toString(2).padStart(2, '0');
+      const bin = (k) => k.toString(2).padStart(2, '0'), obstacles = [];     // boxes that labels must keep clear of: markers and level numbers
       if (has('bits') && v('bits')) {                    // each grid point is a possible stored value: its level numbers, in binary, are what is saved
         const o = Q[rot.sel], st = 2 * o.m / 3;
-        for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); }
+        for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); obstacles.push({ x: bx - 9, y: by + 4, w: 18, h: 12 }, { x: lx - 24, y: ly - 6, w: 20, h: 12 }); }
       }
       if (has('quant') && !has('trail') && v('end')) Q.forEach((o, i) => {   // a hollow marker where each group is stored: the dot moved there
         const [x, y] = pt(o.q[0], o.q[1]), [px, py] = pt(P[i][0], P[i][1]);
@@ -452,7 +452,24 @@
       const showMarker = trail ? v('end') : v('start');   // the solid marker is where a group is stored (trail figure) or where it is after the rotation (the others)
       if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(shape(grp[i].spiky, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
       if (showMarker) P.forEach((p, i) => { const [cx, cy] = pt(...at(p, i)); kids.push(word(cx, cy + inside(grp[i].spiky), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
-      if (has('bits') && v('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)};opacity:${(e ** 3).toFixed(2)}`)); });   // the stored value of each group; flips inwards near the edges so the label stays in view
+      if (has('bits') && v('bits')) {                    // the stored value of each group, kept clear of every marker, of the level numbers and of the other labels
+        Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]); obstacles.push({ x: x - 11, y: y - 11, w: 22, h: 22 }); });
+        const overlap = (a, b) => Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)) * Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+        const VX0 = 0, VX1 = 330, VY0 = -8, VY1 = 314, placed = [];
+        Q.forEach((o, i) => {
+          const [x, y] = pt(o.q[0], o.q[1]), text = `(${o.ix.map(bin).join(',')})`, w = text.length * 6.2 + 2, h = 12;
+          let best = null;
+          for (const dist of [13, 21, 31]) for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const anchor = dx > 0 ? 'start' : dx < 0 ? 'end' : 'middle', tx = x + dx * dist * (dy ? .8 : 1), ty = y + dy * dist * (dx ? .8 : 1) + (dy > 0 ? 6 : dy < 0 ? -2 : 4);   // the text's baseline
+            const bx = anchor === 'start' ? tx : anchor === 'end' ? tx - w : tx - w / 2, box = { x: bx, y: ty - 9.5, w, h };
+            const out = Math.max(0, VX0 - box.x) + Math.max(0, box.x + w - VX1) + Math.max(0, VY0 - box.y) + Math.max(0, box.y + h - VY1);
+            const score = [...obstacles, ...placed].reduce((a, ob) => a + overlap(box, ob), 0) + out * 40 + dist * .3;
+            if (!best || score < best.score) best = { score, tx, ty, anchor, box };
+          }
+          placed.push(best.box);
+          kids.push(word(best.tx, best.ty, text, best.anchor, 'lbl bitl', `fill:${col(i)};opacity:${(e ** 3).toFixed(2)}`));
+        });
+      }
       let curves = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle: one curve for each kind of group
         const spike = (flag) => (d) => { const g2 = grp.filter((g) => g.spiky === flag); return mean(g2.map((g) => { const q = turn2(g.dir, d); return Math.max(Math.abs(q[0]), Math.abs(q[1])); })); };
