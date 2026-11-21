@@ -271,3 +271,11 @@
 .siri-explainer figure.widget .sx-opts button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 14%, var(--sx-panel)); }
 .siri-explainer figure.widget .sx-opts button[aria-pressed=true] span { color: var(--text); }
 .siri-explainer figure.widget .sx-hint { color: var(--muted); font-size: .85rem; margin: .1rem 0 .6rem; }
+
+/* Group colours for the 2D figure: eight distinguishable colours, in a fixed order */
+.siri-explainer { --pc0: #2a78d6; --pc1: #eb6834; --pc2: #1baf7a; --pc3: #eda100; --pc4: #e87ba4; --pc5: #008300; --pc6: #6250d6; --pc7: #e34948; }
+@media (prefers-color-scheme: dark) { .siri-explainer { --pc0: #3987e5; --pc1: #d95926; --pc2: #199e70; --pc3: #c98500; --pc4: #d55181; --pc5: #0ca30c; --pc6: #9085e9; --pc7: #e66767; } }
+.sx-r2 .sq { fill: none; }
+.sx-r2 .gd { opacity: .55; }
+.sx-r2 .pt.sel { stroke: var(--text); }
+.sx-r2 .gnum { font-weight: bold; font-size: 12px; pointer-events: none; }
