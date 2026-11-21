@@ -269,7 +269,7 @@
     const S = 128, CX = 320, CY = 172, NAMES = ['A', 'B', 'C', 'D'];
     const norm3 = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
     const base = [[1, 0.1, 0.05], [0.08, -1, 0.1], [0.1, 0.05, 1], [0.5, 0.5, 0.7]].map(norm3);
-    const state = { deg: 0, sel: 0, yaw: -0.6, pitch: 0.4 };
+    const state = { deg: 0, sel: 0, yaw: -0.6, pitch: 0.4, follow: false };
     const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
     const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
     const rotate = (v, deg) => {                       // Rodrigues' formula about the diagonal (1,1,1)
@@ -277,7 +277,8 @@
       const d = a * (v[0] + v[1] + v[2]), cr = [a * (v[2] - v[1]), a * (v[0] - v[2]), a * (v[1] - v[0])];
       return [0, 1, 2].map((i) => v[i] * c + cr[i] * s + a * d * (1 - c));
     };
-    const proj = (p) => {
+    const proj = (p0) => {
+      const p = state.follow ? rotate(p0, -state.deg) : p0;     // camera riding with the points: turn everything back
       const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw), cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
       const x1 = p[0] * cy - p[1] * sy, y1 = p[0] * sy + p[1] * cy;
       return [CX + S * x1, CY - S * (p[2] * cp + y1 * sp)];
@@ -316,6 +317,7 @@
     $(fig, '[data-k=deg]').addEventListener('input', (e) => set(+e.target.value));
     $(fig, '[data-act=flat]').addEventListener('click', () => set(60));
     $(fig, '[data-act=reset]').addEventListener('click', () => set(0));
+    $(fig, '[data-act=follow]').addEventListener('click', (e) => { state.follow = !state.follow; e.currentTarget.setAttribute('aria-pressed', String(state.follow)); e.currentTarget.textContent = state.follow ? 'camera follows the points' : 'camera follows the axes'; draw(); });
     let drag = null;
     svg.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch, moved: false }; });
     window.addEventListener('pointermove', (e) => {
@@ -373,6 +375,61 @@
       else { state.zoom = !state.zoom; b.setAttribute('aria-pressed', String(state.zoom)); }
       draw();
     }));
+    draw();
+  };
+
+  // 6b. PCA versus the Hadamard rotation on the same groups of 8 weights
+  const pcaFig = (fig) => {
+    const M = 24, D = 8, CLIP = 4, state = { ds: 'spiky' }; let seed = 3;
+    const rng = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const data = () => {
+      const r = rng(seed), g = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+      if (state.ds === 'spiky') return Array.from({ length: M }, () => { const row = Array.from({ length: D }, () => .35 * g()); row[Math.floor(r() * D)] += (r() < .5 ? -1 : 1) * (3.5 + .6 * g()); return row; });
+      const u = Array.from({ length: D }, g), l = Math.hypot(...u), uu = u.map((x) => x / l);
+      return Array.from({ length: M }, () => { const a = g(); return uu.map((x) => 3.2 * a * x + .45 * g()); });
+    };
+    const eig = (C) => {                                // Jacobi rotations for a small symmetric matrix
+      const A = C.map((r) => r.slice()), V = Array.from({ length: D }, (_, i) => Array.from({ length: D }, (_, j) => (i === j ? 1 : 0)));
+      for (let sweep = 0; sweep < 60; sweep++) for (let p = 0; p < D; p++) for (let q = p + 1; q < D; q++) {
+        if (Math.abs(A[p][q]) < 1e-14) continue;
+        const th = (A[q][q] - A[p][p]) / (2 * A[p][q]), t = Math.sign(th || 1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), sn = t * c;
+        for (let k = 0; k < D; k++) { const a = A[k][p], b = A[k][q]; A[k][p] = c * a - sn * b; A[k][q] = sn * a + c * b; }
+        for (let k = 0; k < D; k++) { const a = A[p][k], b = A[q][k]; A[p][k] = c * a - sn * b; A[q][k] = sn * a + c * b; }
+        for (let k = 0; k < D; k++) { const a = V[k][p], b = V[k][q]; V[k][p] = c * a - sn * b; V[k][q] = sn * a + c * b; }
+      }
+      return A.map((r, i) => i).sort((a, b) => A[b][b] - A[a][a]).map((i) => V.map((row) => row[i]));   // eigenvectors, biggest first, as columns
+    };
+    const pca = (X) => {
+      const C = Array.from({ length: D }, (_, i) => Array.from({ length: D }, (_, j) => X.reduce((a, r) => a + r[i] * r[j], 0) / M));
+      const cols = eig(C);                               // cols[k][i] = component i of eigenvector k
+      return X.map((r) => cols.map((v) => r.reduce((a, x, i) => a + x * v[i], 0)));
+    };
+    const fwht = (x) => { const y = x.slice(); for (let h = 1; h < D; h *= 2) for (let i = 0; i < D; i += 2 * h) for (let j = i; j < i + h; j++) { const a = y[j], b = y[j + h]; y[j] = a + b; y[j + h] = a - b; } return y.map((v) => v / Math.sqrt(D)); };
+    const stats = (Y) => {
+      const tot = Y.reduce((a, r) => a + r.reduce((b, x) => b + x * x, 0), 0), cols = Array.from({ length: D }, (_, c) => Y.reduce((a, r) => a + r[c] * r[c], 0) / tot);
+      let spike = 0, err = 0;
+      Y.forEach((r) => { const len = Math.hypot(...r), m = Math.max(...r.map(Math.abs)), st = 2 * m / 3; spike += m / len / M; err += Math.hypot(...r.map((x) => x - (-m + Math.round((x + m) / st) * st))) / len / M; });
+      return { cols, spike, err };
+    };
+    const draw = () => {
+      const X = data(), views = [['As given', X], ['After PCA', pca(X)], ['After Hadamard', X.map(fwht)]], kids = [], W = 260, CW = W / D, RH = 5, res = [];
+      views.forEach(([title, Y], v) => {
+        const x0 = 20 + v * 295, st = stats(Y); res.push(st);
+        const t = mk('text', { x: x0, y: 14, class: 'lbl' }); t.textContent = title; kids.push(t);
+        Y.forEach((r, i) => r.forEach((val, c) => { const k = Math.max(-1, Math.min(1, val / CLIP)); kids.push(mk('rect', { x: x0 + c * CW, y: 22 + i * RH, width: CW - 1, height: RH, style: `fill:color-mix(in srgb, var(${k >= 0 ? '--sx-red' : '--sx-blue'}) ${Math.abs(k) * 100}%, var(--bg))` })); }));
+        st.cols.forEach((e, c) => { const h = Math.max(1, e * 56); kids.push(mk('rect', { x: x0 + c * CW, y: 22 + M * RH + 10 + 56 - h, width: CW - 1, height: h, class: 'pcb' })); });
+        const by = 22 + M * RH + 10 + 56 + 14;
+        [`busiest coordinate: ${(Math.max(...st.cols) * 100).toFixed(0)}% of the energy`, `largest weight: ${(st.spike * 100).toFixed(0)}% of its group's length`, `2-bit rounding error: ${(st.err * 100).toFixed(0)}%`].forEach((txt, i) => { const tx = mk('text', { x: x0, y: by + i * 14, class: 'lbl' }); tx.textContent = txt; kids.push(tx); });
+      });
+      svg.replaceChildren(...kids);
+      note.textContent = state.ds === 'spiky'
+        ? `Every group has one big weight in a random place, so no single direction stands out and PCA has little to find: the error only moves from ${(res[0].err * 100).toFixed(0)}% to ${(res[1].err * 100).toFixed(0)}%. The Hadamard rotation spreads each spike over all 8 coordinates (largest weight ${(res[0].spike * 100).toFixed(0)}% → ${(res[2].spike * 100).toFixed(0)}% of the length) and the error falls to ${(res[2].err * 100).toFixed(0)}%.`
+        : `The weights share one direction. PCA finds it and moves nearly all the energy into the first coordinate (${(Math.max(...res[1].cols) * 100).toFixed(0)}%), which is ideal for dropping the other seven, but each group becomes one big weight plus noise: the error rises from ${(res[0].err * 100).toFixed(0)}% to ${(res[1].err * 100).toFixed(0)}%. The Hadamard rotation does not know the direction and spreads everything out.`;
+    };
+    fig.querySelectorAll('[data-ds]').forEach((b) => b.addEventListener('click', () => { state.ds = b.dataset.ds; fig.querySelectorAll('[data-ds]').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); draw(); }));
+    $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; draw(); });
     draw();
   };
 
@@ -556,6 +613,6 @@
     info.textContent = 'Hover a cell to see its group.'; gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot3d: rot3dFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot3d: rot3dFig, pca: pcaFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();

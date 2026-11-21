@@ -184,3 +184,8 @@
 .sx-r3 .snap3 { stroke: var(--sx-red); stroke-width: 2; }
 .sx-r3 .qpt { fill: none; stroke: var(--sx-red); stroke-width: 2; }
 .sx-r3 .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+
+/* Figure 6b: PCA versus Hadamard */
+.sx-pc { width: 100%; height: auto; display: block; }
+.sx-pc .lbl { fill: var(--muted); font: 12px var(--sx-sans); }
+.sx-pc .pcb { fill: var(--sx-blue); }

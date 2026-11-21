@@ -7,7 +7,7 @@
     <meta name="description" content="How the genuine iOS 6 Siri interface was brought to an iPod touch 4th generation and wired to speech recognition and a language model that run on the iPod itself." />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
-    <link rel="stylesheet" href="assets/explainer.css?v=9" />
+    <link rel="stylesheet" href="assets/explainer.css?v=10" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -233,7 +233,7 @@
 
 <p><strong>Step 2: rotate the group.</strong> Grouping keeps an outlier from spoiling its whole row, but inside its own group it still stretches the levels for the other 63 weights. What matters is how spiky the group is: its largest weight compared with the group's overall size, which is its length. You can't remove a spike without changing the weights, but you can change the axes you write them against.</p>
 
-<p>Picture a group of just three weights as a point in 3D space, one weight per axis. The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate. A point close to an axis has one big weight and two tiny ones, so the cube must be as large as the point is long, and the grid is coarse. Rotate the point, which is the same as writing it against rotated axes, and the same point with the same length has no dominant coordinate. The cube shrinks, the grid around the point gets finer, and the rounding error drops. Click a point to see its grid, drag the background to look around, and turn the slider:</p>
+<p>Picture a group of just three weights as a point in 3D space, one weight per axis. The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate. A point close to an axis has one big weight and two tiny ones, so the cube must be as large as the point is long, and the grid is coarse. Rotate the point, which is the same as writing it against rotated axes, and the same point with the same length has no dominant coordinate. The cube shrinks, the grid around the point gets finer, and the rounding error drops. Click a point to see its grid, drag the background to look around, and turn the slider. The camera button switches the view between staying with the axes (the points move) and staying with the points (the axes and the cube turn the other way); it is the same picture seen from two places:</p>
 
 <figure class="widget wide" data-widget="rot3d">
   <figcaption><strong>Rotating four groups of three weights.</strong> Each dot is one group, a point on a sphere of length 1. The cube is the range its levels must cover, with 4 levels per axis (2 bits), and the gold line goes from the point to the level it rounds to. Rotating about the diagonal by 60° turns every axis-aligned spike into a flatter point; at 120° the points are spiky again.</figcaption>
@@ -241,6 +241,7 @@
     <label>Rotate <input type="range" min="0" max="120" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
     <button data-act="flat">60° (flattest)</button>
     <button data-act="reset">reset</button>
+    <button data-act="follow" aria-pressed="false">camera follows the axes</button>
   </div>
   <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="Four points in three dimensions with the cube of quantization levels around the selected point"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
@@ -275,6 +276,21 @@
   <svg class="sx-sp" viewBox="0 0 640 330" role="img" aria-label="Bars and histograms of a group of weights before and after rotation"></svg>
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
+
+<p><strong>Why not PCA?</strong> If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar, and PCA is also a rotation. But it has the opposite goal. PCA looks at many vectors, finds the directions in which they vary most, and rotates so those become the axes. That piles the energy into a few coordinates, which is what you want when compressing by throwing the rest away. For rounding it is the wrong thing, because a coordinate that dominates is exactly the outlier we are trying to avoid. The Hadamard rotation uses no data at all and spreads the energy evenly. Here are both, applied to the same 24 groups of 8 weights:</p>
+
+<figure class="widget wide" data-widget="pca">
+  <figcaption><strong>PCA and the Hadamard rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
+  <div class="sx-controls">
+    <button data-ds="spiky" aria-pressed="true">each group has one big weight</button>
+    <button data-ds="corr" aria-pressed="false">weights move together</button>
+    <button data-act="new">new data</button>
+  </div>
+  <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after the Hadamard rotation, with the energy per coordinate below each"></svg>
+  <p class="sx-note" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Neither rotation is better in general; they are tools for different jobs. PCA also needs a rotation fitted to each layer's data, and stored. The Hadamard rotation needs neither, and it is the one that has the fast add-and-subtract form from step 4.</p>
 
 <p><strong>Step 3: snap to a codebook made for bell curves.</strong> Because rotated groups all have roughly the same bell shape (once divided by their length), one set of levels can serve all of them. The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook. Each weight stores the 4-bit index of its nearest level. With 2 bits there are only 4 levels; Whistle mixes 2- and 4-bit layers.</p>
 
@@ -387,6 +403,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
       </div>
     </article>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
-    <script src="assets/explainer.js?v=9" defer></script>
+    <script src="assets/explainer.js?v=10" defer></script>
   </body>
 </html>
