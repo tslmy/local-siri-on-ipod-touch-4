@@ -355,6 +355,35 @@
     draw();
   };
 
+  // 0. Plain quantization: fewer bits, coarser rounding, and what an outlier does to it
+  const quantizeFig = (fig) => {
+    const N = 40, state = { bits: 3, outlier: false }; let seed = 5;
+    const rng = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const draw = () => {
+      const r = rng(seed), g = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
+      const w = Array.from({ length: N }, g); if (state.outlier) w[Math.floor(r() * N)] = 9 * (r() < .5 ? -1 : 1);
+      const m = Math.max(...w.map(Math.abs)), n = 2 ** state.bits, step = 2 * m / (n - 1);
+      const levels = Array.from({ length: n }, (_, k) => -m + k * step), nearest = (x) => -m + Math.round((x + m) / step) * step;
+      const X = (x) => 20 + ((x + 9.5) / 19) * 600, big = w.findIndex((x) => Math.abs(x) === m);
+      const kids = [mk('line', { x1: 20, x2: 620, y1: 112, y2: 112, class: 'axis' })];
+      levels.forEach((l) => kids.push(mk('line', { x1: X(l), x2: X(l), y1: 104, y2: 120, class: 'level' })));
+      w.forEach((x, i) => {
+        const y = 18 + (i % 6) * 13;
+        kids.push(mk('line', { x1: X(x), x2: X(nearest(x)), y1: y, y2: 104, class: 'snap' }));
+        kids.push(mk('circle', { cx: X(x), cy: y, r: 4, class: state.outlier && i === big ? 'dot out' : 'dot' }));
+      });
+      svg.replaceChildren(...kids);
+      const e2 = w.reduce((a, x) => a + (x - nearest(x)) ** 2, 0), p2 = w.reduce((a, x) => a + x * x, 0);
+      note.textContent = `${state.bits} bit${state.bits > 1 ? 's' : ''} = ${n} levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(2)}.`;
+    };
+    $(fig, '[data-k=bits]').addEventListener('input', (e) => { state.bits = +e.target.value; $(fig, '[data-o=bits]').textContent = state.bits; draw(); });
+    $(fig, '[data-k=outlier]').addEventListener('click', (e) => { state.outlier = !state.outlier; e.currentTarget.setAttribute('aria-pressed', String(state.outlier)); draw(); });
+    $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; draw(); });
+    $(fig, '[data-o=bits]').textContent = state.bits; draw();
+  };
+
   // 9. Why weights are grouped: a toy matrix, per-group scales, rounding error and storage per row
   const groupingFig = (fig) => {
     const R = 12, C = 64, CW = 10, RH = 11, BARH = 46, SIZES = [64, 32, 16, 8, 4], NS = 'http://www.w3.org/2000/svg';
@@ -434,6 +463,6 @@
     info.textContent = 'Hover a cell to see its group.'; gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();
