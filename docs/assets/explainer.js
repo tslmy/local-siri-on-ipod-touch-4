@@ -748,16 +748,18 @@
   // 9. Why weights are grouped: a toy matrix, per-group scales, rounding error and storage per row
   const groupingFig = (fig) => {
     const R = 12, C = 64, CW = 10, RH = 11, BARH = 46, SIZES = [64, 32, 16, 8, 4], NS = 'http://www.w3.org/2000/svg';
-    const state = { g: 0, out: true, sel: 0 }; let seed = 7;
+    const state = { g: 0, out: true, nout: 6, sel: 0 }; let seed = 7;
     const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const gauss = () => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
-    let base = [], outl = [];
+    let base = [], outl = [], outList = [];
     const gen = () => {
       base = Array.from({ length: R }, () => { const s = Math.exp(.35 * gauss()); return Array.from({ length: C }, () => gauss() * s); });
-      outl = Array.from({ length: R }, () => new Array(C).fill(0));
-      for (let k = 0; k < 6; k++) outl[Math.floor(rng() * R)][Math.floor(rng() * C)] = (rng() < .5 ? -1 : 1) * (6 + 4 * rng());
+      outList = []; const seen = new Set();               // 24 possible outliers; the slider decides how many are in the matrix
+      while (outList.length < 24) { const r0 = Math.floor(rng() * R), c0 = Math.floor(rng() * C), key = r0 * C + c0; if (seen.has(key)) continue; seen.add(key); outList.push({ r: r0, c: c0, v: (rng() < .5 ? -1 : 1) * (6 + 4 * rng()) }); }
+      applyOut();
       state.sel = Math.floor(rng() * R);
     };
+    const applyOut = () => { outl = Array.from({ length: R }, () => new Array(C).fill(0)); outList.slice(0, state.nout).forEach(({ r, c, v }) => { outl[r][c] = v; }); state.out = state.nout > 0; };
     const val = (r, c) => (state.out && outl[r][c] ? outl[r][c] : base[r][c]);
     const mk = (tag, attrs, style) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); if (style) e.style.cssText = style; return e; };
     const stats = (gs) => {                              // 16 evenly spaced levels per group, sized to its largest weight
@@ -808,9 +810,9 @@
     });
     tab.addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) { state.g = +tr.dataset.i; $(fig, '[data-k=g]').value = state.g; draw(); } });
     $(fig, '[data-k=g]').addEventListener('input', (e) => { state.g = +e.target.value; draw(); });
-    $(fig, '[data-k=out]').addEventListener('change', (e) => { state.out = e.target.checked; draw(); });
+    $(fig, '[data-k=nout]').addEventListener('input', (e) => { state.nout = +e.target.value; $(fig, '[data-o=nout]').textContent = state.nout; applyOut(); draw(); });
     $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; gen(); draw(); });
-    info.textContent = 'Hover a cell to see its group.'; gen(); draw();
+    info.textContent = 'Hover a cell to see its group.'; $(fig, '[data-o=nout]').textContent = state.nout; gen(); draw();
   };
 
   // 9a. The groups of the grouping figure, split into those that contain an outlier and the rest: how much each loses to rounding
@@ -833,7 +835,7 @@
       });
       svg.replaceChildren(...kids);
       note.textContent = !d.outliersOn || !withO.length
-        ? 'No group has an outlier right now. Tick "outliers" in the figure above (or press "New matrix") to see them.'
+        ? 'No group has an outlier right now. Raise "Outliers" in the figure above (or press "New matrix") to see them.'
         : `Groups of ${d.gs}: the ${withO.length} with an outlier lose ${mean(withO.map((g) => g.loss)).toFixed(2)} on average, the other ${without.length} lose ${mean(without.map((g) => g.loss)).toFixed(2)}. That is ${(mean(withO.map((g) => g.loss)) / mean(without.map((g) => g.loss))).toFixed(1)} times as much, for weights that are almost all ordinary.`;
     };
     groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
