@@ -452,6 +452,7 @@
         const kids = [];
         for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) kids.push(mk('rect', { x: c * CW, y: r * RH, width: CW + .4, height: RH + .4 }, `fill:${color(r, c)}`));
         for (let g = 1; g < ng; g++) kids.push(mk('line', { x1: g * gs * CW, x2: g * gs * CW, y1: 0, y2: R * RH, class: 'gl' }));
+        if (state.out) for (let r = 0; r < R; r++) for (let c = 0; c < C; c++) if (outl[r][c]) kids.push(mk('rect', { x: c * CW + .75, y: r * RH + .75, width: CW - 1.5, height: RH - 1.5, class: 'olc' }));
         kids.push(mk('rect', { x: 1, y: state.sel * RH + 1, width: C * CW - 2, height: RH - 2, class: 'sel' }));
         return kids;
       };

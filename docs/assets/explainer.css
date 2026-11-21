@@ -170,3 +170,4 @@
 .sx-cq .lv { fill: var(--text); font: 10px var(--sx-mono); }
 .sx-cq .bn { fill: var(--muted); font: 10px var(--sx-mono); }
 .sx-cq .selk { fill: var(--accent); font-weight: bold; }
+.sx-gr .olc { fill: none; stroke: var(--sx-gold); stroke-width: 1.5; pointer-events: none; }
