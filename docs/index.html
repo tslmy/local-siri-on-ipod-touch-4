@@ -284,7 +284,7 @@
 <li>Slide "Groups per row" up from one, which is a single scale for the whole row, and watch the rounding error fall.</li>
 <li>"Groups with outliers" and "Outlier size" decide how many groups contain an outlier and how big it is. Slide the first down to 0 to see how much of the effect the added outliers cause.</li>
 <li>The 16 levels are spread evenly up to the largest weight in each group: the plain scheme from the figure above.</li>
-<li>The weights are drawn the way real ones behave: most are small and a few are large, even before any outlier is added.</li>
+<li>The weights are drawn with a few large ones among many small ones, even before any outlier is added.</li>
 </ul>
 
 <figure class="widget wide" id="why-grouped" data-widget="grouping">
@@ -631,14 +631,28 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat the savings.</p>
 
-<p>Start with the shape of the values. Each rotated weight is a mix of all the weights in its group, so by the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a> the values pile up in a bell curve: most near zero, few in the tails. Here are the weights from <a class="xref" href="#why-grouped">"Why weights are grouped"</a> before and after rotating each group. Each group is first divided by its length, so that groups of different sizes can share one histogram (the histogram follows the controls of that figure, so try a bigger group or a bigger outlier):</p>
+<p>Start with the shape of the values. Each rotated weight is a mix of all the weights in its group, so by the <a href="https://en.wikipedia.org/wiki/Central_limit_theorem">central limit theorem</a> the values pile up in a bell curve: most near zero, few in the tails. Here are the real weights of SmolLM2, counted before and after rotating each group. Each group is first divided by its length, so that every group is measured on the same scale:</p>
 
 <figure class="widget wide" data-widget="hist">
-  <figcaption><strong>The weights' histogram, before and after rotation.</strong> Each bar counts the weights in a narrow range of values, measured in standard deviations (σ) after dividing each group by its length. The same weights appear in both panels; the right one has each group multiplied by the Hadamard matrix. Gold marks weights from groups that contain an outlier.</figcaption>
-  <svg class="sx-ol" viewBox="0 0 640 190" role="img" aria-label="Two histograms of the weights of the toy matrix, before and after rotating each group, each with a bell curve of the same spread drawn over it"></svg>
+  <figcaption><strong>SmolLM2's weights, before and after rotation.</strong> Each bar counts the weights in a narrow range of values, measured in standard deviations (σ) after dividing each group by its length. The same weights appear in both panels; the right one has each group multiplied by the Hadamard matrix. The dashed curve is an ideal bell curve. Switch on the log scale to see the tails, where the counts are tiny.</figcaption>
+  <div class="sx-controls">
+    <span class="sx-seg" role="group" aria-label="Which weights"><button data-cls="all" aria-pressed="true">all layers</button><button data-cls="attention" aria-pressed="false">attention</button><button data-cls="mlp" aria-pressed="false">feed-forward</button><button data-cls="embedding" aria-pressed="false">embedding</button></span>
+    <label>Weights per group <input type="range" min="0" max="3" step="1" value="3" data-k="g"> <output data-o="g"></output></label>
+    <button data-k="log" aria-pressed="false">log scale</button>
+  </div>
+  <svg class="sx-ol" viewBox="0 0 640 190" role="img" aria-label="Two histograms of SmolLM2's weights, before and after rotating each group, each with a bell curve drawn over it"></svg>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
+<p>What the real weights show, for groups of 64:</p>
+<ul>
+<li><strong>They are already close to a bell curve</strong> in the attention and feed-forward layers, with a kurtosis of 3.2 and 3.1 (a bell curve has 3). Dividing by the group's length does much of the work.</li>
+<li><strong>The embedding is the exception,</strong> with a kurtosis of 5.2: a sharper peak and longer tails.</li>
+<li><strong>Rotation trims the tails and evens out the layers.</strong> Every part lands at a kurtosis of 2.9, which is exactly what a random direction in 64 dimensions gives (\(3G/(G+2)\)), so it cannot get more bell-like than that. The share of weights beyond 3σ falls from 0.50% to 0.20%, and the largest value from 7.9σ to 5.5σ.</li>
+<li><strong>Small groups show little.</strong> In a group of 8 no value can exceed \(\sqrt{8} = 2.8\sigma\), so there are no tails to trim. Slide the group size up to see the effect grow.</li>
+</ul>
+
+<p>That shape is what the next steps rely on:</p>
 <ul>
 <li><strong>Evenly spaced levels suit this badly.</strong> They are wasted on the tails, where almost nothing lands, and leave the crowded middle coarsely rounded.</li>
 <li><strong>Because the shape is known in advance, the levels can be designed once, ahead of time.</strong> They need only be dense where the bell is tall and sparse where it is short.</li>
@@ -861,6 +875,7 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=82" defer></script>
+    <script src="assets/weight-hist.js?v=1" defer></script>
+    <script src="assets/explainer.js?v=84" defer></script>
   </body>
 </html>

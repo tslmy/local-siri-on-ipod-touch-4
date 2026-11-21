@@ -1018,38 +1018,39 @@
     groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
   };
 
-  // 9b. Histogram of the grouping figure's weights, before and after rotating each group
+  // 9b. Histograms of SmolLM2's real weights before and after rotating each group (data from convert/weight_hist.py)
   const histFig = (fig) => {
-    const svg = $(fig, 'svg'), note = $(fig, '.sx-note');
-    const fwht = (x) => { const y = x.slice(), n = y.length; for (let h = 1; h < n; h *= 2) for (let i = 0; i < n; i += 2 * h) for (let j = i; j < i + h; j++) { const a = y[j], b = y[j + h]; y[j] = a + b; y[j + h] = a - b; } return y.map((v) => v / Math.sqrt(n)); };
+    const D = window.WEIGHT_HIST, svg = $(fig, 'svg'), note = $(fig, '.sx-note');
+    if (!D) { note.textContent = 'The weight statistics did not load.'; return; }
+    const SIZES = [8, 16, 32, 64], LABEL = { all: 'all layers', attention: 'attention layers', mlp: 'feed-forward layers', embedding: 'embedding' };
+    const st = { cls: 'all', g: 3, log: false };
     const txt = (x, y, str, anchor, cls) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
-    const render = (d) => {
-      const gs = d.gs, before = [], after = [], flag = []; let gi = 0;
-      d.values.forEach((row) => { for (let g = 0; g < row.length; g += gs) { const raw = row.slice(g, g + gs), l = Math.sqrt(raw.reduce((a, v) => a + v * v, 0) / gs) || 1, grp = raw.map((v) => v / l); before.push(...grp); after.push(...fwht(grp)); const o = d.outliersOn && d.groups[gi++].outlier; for (let k = 0; k < gs; k++) flag.push(o); } });
-      const n = before.length, xm = Math.max(4, Math.ceil(Math.max(...before.map(Math.abs), ...after.map(Math.abs)))), NB = 4 * xm + 1, bw = 2 * xm / NB;
-      const bins = (a, keep) => { const c = new Array(NB).fill(0); a.forEach((v, i) => { if (keep(i)) c[Math.min(NB - 1, Math.max(0, Math.floor((v + xm) / bw)))]++; }); return c; };
-      const all = [bins(before, () => true), bins(after, () => true)], odd = [bins(before, (i) => flag[i]), bins(after, (i) => flag[i])], top = Math.max(...all[0], ...all[1]) * 1.1;
-      const kids = [], W = 296, H = 130, Y0 = 36, dens = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
-      ['Before rotation', 'After rotating each group'].forEach((title, p) => {
-        const ox = p * 324, X = (v) => ox + 8 + (W - 16) * (v + xm) / (2 * xm), Y = (k) => Y0 + H - H * k / top, cw = (W - 16) / NB;
+    const draw = () => {
+      const G = SIZES[st.g], d = D.data[`${st.cls}/${G}`], NB = D.bins.n, bw = D.bins.width, xm = -D.bins.lo, n = d.n;
+      $(fig, '[data-o=g]').textContent = G;
+      fig.querySelectorAll('[data-cls]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cls === st.cls)));
+      $(fig, '[data-k=log]').setAttribute('aria-pressed', String(st.log));
+      const dens = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+      const top = Math.max(...d.before, ...d.after, n * bw * dens(0)) * 1.08;
+      const T = (k) => (st.log ? Math.log10(1 + k) / Math.log10(1 + top) : k / top);
+      const kids = [], W = 296, H = 130, Y0 = 36, cw = (W - 16) / NB;
+      [['Before rotation', d.before, 'var(--sx-blue)'], ['After rotating each group', d.after, 'var(--sx-gold)']].forEach(([title, c, color], p) => {
+        const ox = p * 324, X = (v) => ox + 8 + (W - 16) * (v + xm) / (2 * xm), Y = (k) => Y0 + H - H * T(k);
         kids.push(txt(ox + W / 2, 16, title, 'middle', 'lbl rowname'));
-        all[p].forEach((k, i) => {
-          if (!k) return; const x = ox + 8 + cw * i + .5, hAll = H * k / top, hOdd = odd[p][i] ? Math.max(3, H * odd[p][i] / top) : 0;
-          kids.push(sv('rect', { x, y: Y0 + H - hAll, width: cw - 1, height: hAll }, 'fill:var(--sx-blue);opacity:.8'));
-          if (hOdd) kids.push(sv('rect', { x, y: Y0 + H - hOdd, width: cw - 1, height: hOdd }, 'fill:var(--sx-gold)'));
-        });
-        const pts = []; for (let i = 0; i <= 80; i++) { const z = -xm + 2 * xm * i / 80; pts.push(`${X(z).toFixed(1)},${Y(n * bw * dens(z)).toFixed(1)}`); }
+        c.forEach((k, i) => { if (!k) return; const h = Math.max(1, H * T(k)); kids.push(sv('rect', { x: ox + 8 + cw * i + .2, y: Y0 + H - h, width: cw - .4, height: h }, `fill:${color};opacity:.85`)); });
+        const pts = []; for (let i = 0; i <= 120; i++) { const z = -xm + 2 * xm * i / 120; pts.push(`${X(z).toFixed(1)},${Y(n * bw * dens(z)).toFixed(1)}`); }
         kids.push(sv('polyline', { points: pts.join(' '), fill: 'none', class: 'mean' }, 'stroke-dasharray:4 3;stroke-width:1.5'));
         kids.push(sv('line', { x1: ox + 8, x2: ox + W - 8, y1: Y0 + H, y2: Y0 + H, class: 'ax' }));
-        for (let t = -xm; t <= xm; t += xm > 6 ? 4 : 2) { kids.push(sv('line', { x1: X(t), x2: X(t), y1: Y0 + H, y2: Y0 + H + 4, class: 'ax' })); kids.push(txt(X(t), Y0 + H + 16, t ? (t > 0 ? '+' : '−') + Math.abs(t) + 'σ' : '0', 'middle')); }
+        for (let t = -6; t <= 6; t += 2) { kids.push(sv('line', { x1: X(t), x2: X(t), y1: Y0 + H, y2: Y0 + H + 4, class: 'ax' })); kids.push(txt(X(t), Y0 + H + 16, t ? (t > 0 ? '+' : '−') + Math.abs(t) + 'σ' : '0', 'middle')); }
       });
       svg.replaceChildren(...kids);
-      const nOdd = flag.filter(Boolean).length / gs;
-      note.textContent = nOdd
-        ? `Groups of ${gs}: the ${nOdd} gold groups contain an outlier. Before rotation, each puts one weight far out at about ${Math.sqrt(gs).toFixed(1)}σ and the other ${gs - 1} piled up near zero; after it, all ${gs} sit at similar sizes, inside the bell. The blue groups change too: a few big weights among many small ones become evenly sized values, so the sharp peak with long tails turns into a bell. The dashed curve is an ideal bell curve.`
-        : `Groups of ${gs}, no outliers right now. Raise "Groups with outliers" above to see how they show up. The dashed curve is an ideal bell curve.`;
+      const f = (v) => v.toFixed(v < 10 ? 1 : 0);
+      note.textContent = `${D.model}, ${LABEL[st.cls]}, groups of ${G} (${(n / 1e6).toFixed(0)} million weights). Kurtosis (3 for a bell curve): ${d.kurt[0].toFixed(2)} before, ${d.kurt[1].toFixed(2)} after. Beyond 3σ (a bell curve has 0.27%): ${d.beyond3[0]}% before, ${d.beyond3[1]}% after. Largest value: ${f(d.max[0])}σ before, ${f(d.max[1])}σ after. A group of ${G} cannot hold a value beyond √${G} = ${Math.sqrt(G).toFixed(1)}σ.`;
     };
-    groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
+    fig.querySelectorAll('[data-cls]').forEach((b) => b.addEventListener('click', () => { st.cls = b.dataset.cls; draw(); }));
+    $(fig, '[data-k=g]').addEventListener('input', (e) => { st.g = +e.target.value; draw(); });
+    $(fig, '[data-k=log]').addEventListener('click', () => { st.log = !st.log; draw(); });
+    draw();
   };
 
   // 10. Lloyd's algorithm, step by step: the levels start evenly spaced and move to where the values are
