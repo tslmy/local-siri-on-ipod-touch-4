@@ -1021,12 +1021,12 @@
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // A contents column that floats on the left of wide windows: every numbered section, the 4-bit section's steps, and a highlight on the one being read
   (() => {
-    const heads = [...document.querySelectorAll('.siri-explainer h2[id]:not(#contents), .siri-explainer h3[id], .siri-explainer [data-toc]')];
+    const heads = [...document.querySelectorAll('.siri-explainer h2[id]:not(#contents), .siri-explainer h3[id], .siri-explainer h4[id], .siri-explainer [data-toc]')];
     if (!heads.length) return;
     const nav = el('nav', 'toc-float'); nav.setAttribute('aria-label', 'Contents'); nav.append(el('p', 'toc-title', 'Contents'));
     const ul = el('ul'), links = [];
     heads.forEach((h) => {
-      const sub = h.tagName !== 'H2', li = el('li', sub ? 'sub' : ''), a = el('a', null, h.dataset.toc || h.textContent.trim());
+      const li = el('li', h.tagName === 'H2' ? '' : h.tagName === 'H4' ? 'subsub' : 'sub'), a = el('a', null, h.dataset.toc || h.textContent.trim());
       a.href = '#' + h.id; li.append(a); ul.append(li); links.push([h, a]);
     });
     nav.append(ul); document.body.append(nav);
