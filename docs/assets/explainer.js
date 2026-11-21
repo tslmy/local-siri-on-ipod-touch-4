@@ -382,7 +382,7 @@
         const square = (mm, style) => sv('polygon', { points: [[-mm, -mm], [mm, -mm], [mm, mm], [-mm, mm]].map(([x, y]) => pt(x, y).join(',')).join(' '), class: 'sq' }, style);
         const grid = (mm, style, r) => { for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) { const [cx, cy] = pt(-mm + a * 2 * mm / 3, -mm + b * 2 * mm / 3); kids.push(sv('circle', { cx, cy, r, class: 'gd' }, style)); } };
         if (md === 'plain') Q.forEach((o, i) => {          // every group has its own square, in its own colour
-          kids.push(square(o.m, `stroke:${col(i)};stroke-width:${i === rot.sel ? 2.4 : 1.3}`));
+          kids.push(square(o.m, `stroke:${col(i)};stroke-width:${i === rot.sel ? 2 : 1};opacity:${i === rot.sel ? 1 : .55}`));   // thin and faint: the dots sit on their squares' edges, so the arrows must stand out from them
           grid(o.m, `fill:${col(i)}`, 1.8);
           const [cx0, cy0] = pt(-o.m, o.m);
           kids.push(sv('rect', { x: cx0 + i * 11, y: cy0 - 13, width: 8, height: 8, rx: 1.5 }, `fill:${col(i)}`));   // one chip per square, so squares lying on top of each other still count
@@ -390,8 +390,10 @@
         else { kids.push(square(FLAT, 'stroke:var(--sx-gold);stroke-width:1.6')); grid(FLAT, 'fill:var(--muted)', 2); }
         P.forEach((p, i) => {                              // an arrow from each group to the grid point it is stored as
           const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 4) return;
-          const ux = (x2 - x1) / d, uy = (y2 - y1) / d, bx = x2 - ux * 8, by = y2 - uy * 8, wd = i === rot.sel ? 2.6 : 1.6, st = `stroke:${col(i)};stroke-width:${wd}`;
-          kids.push(line(x1, y1, bx, by, 'snap3', st), sv('polygon', { points: `${x2},${y2} ${bx - uy * 4},${by + ux * 4} ${bx + uy * 4},${by - ux * 4}`, class: 'arrh' }, `fill:${col(i)}`));
+          const ux = (x2 - x1) / d, uy = (y2 - y1) / d, hl = Math.min(11, d * .6), bx = x2 - ux * hl, by = y2 - uy * hl, wd = i === rot.sel ? 3 : 2.2, hw = hl * .45;
+          const tri = `${x2},${y2} ${bx - uy * hw},${by + ux * hw} ${bx + uy * hw},${by - ux * hw}`;
+          kids.push(line(x1, y1, bx, by, 'snap3', `stroke:var(--bg);stroke-width:${wd + 3.5}`), sv('polygon', { points: tri, class: 'arrh' }, 'fill:var(--bg);stroke:var(--bg);stroke-width:3.5;stroke-linejoin:round'));   // a background-coloured casing, so the arrow reads as lying on top of the edge
+          kids.push(line(x1, y1, bx, by, 'snap3', `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
         });
       }
       if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 4, class: 'ghost' }, `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
