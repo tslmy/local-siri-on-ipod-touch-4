@@ -244,7 +244,7 @@
 <p id="step-1" data-toc="Step 1: cut rows into groups"><strong>Step 1: cut each row into groups.</strong></p>
 <ul>
 <li>A weight matrix has millions of numbers, and one outlier anywhere would stretch the levels for all of them.</li>
-<li>So each row is split, from left to right, into groups of 64 consecutive weights (128 in Whistle), and each group gets its own scale. A group never spans rows. An outlier now only spoils its own group.</li>
+<li>So each row is split, from left to right, into groups of 64 consecutive weights (128 in Whistle), and each group gets its own scale. A group never spans rows. An outlier now only spoils its own group.<span class="sidenote-wrap"><label for="sn-7" class="sidenote-number"></label><input type="checkbox" id="sn-7" class="sidenote-toggle"><span class="sidenote">Group-wise scales for weights are common practice: <a href="https://arxiv.org/abs/2206.01861">ZeroQuant</a> (Yao et al., 2022) uses them for transformers. The outliers behind them are well documented: <a href="https://arxiv.org/abs/2208.07339">LLM.int8()</a> (Dettmers et al., 2022) found a few large-magnitude features in transformer hidden states, about 0.1% of them, that wreck quality when removed.</span></span></li>
 <li>The scale is a number stored once per group. In the plain scheme it is the group's largest weight, which is what the figure below uses. Whistle stores the group's <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)#Euclidean_norm">length</a>, \(\ell = \sqrt{\textstyle\sum_j w_j^2}\), instead, for reasons that become clear in step 3.</li>
 <li>Inside the group, each weight only has to say "which of 16 levels am I closest to", and 16 levels take 4 bits.</li>
 </ul>
@@ -481,7 +481,7 @@
 
 <h4 id="s2-which" data-toc="Which rotation?">Which rotation?</h4>
 
-<p>Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, because a simple rule generates it: the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. Our groups so far have had two weights, but Whistle's have 64 or 128, so we need one for bigger groups too.</p>
+<p>Many rotations would flatten a spike, as the figures above show. Whistle uses one that needs no multiplications and no stored matrix, because a simple rule generates it: the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>.<span class="sidenote-wrap"><label for="sn-8" class="sidenote-number"></label><input type="checkbox" id="sn-8" class="sidenote-toggle"><span class="sidenote">Rotating before quantizing is a published technique. <a href="https://arxiv.org/abs/2402.04396">QuIP#</a> (Tseng et al., 2024) uses a randomized Hadamard transform on the weights, with random signs that this project does not add. <a href="https://arxiv.org/abs/2404.00456">QuaRot</a> (Ashkboos et al., 2024) rotates a whole LLM with Hadamard matrices to remove outliers for 4-bit inference.</span></span> Our groups so far have had two weights, but Whistle's have 64 or 128, so we need one for bigger groups too.</p>
 <p>It is a square matrix whose entries are all +1 or −1, divided by \(\sqrt{n}\) so that it keeps lengths. The 2×2 one is
 \[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
 and each bigger one is four copies of the previous one, with the bottom-right copy negated:
@@ -762,7 +762,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <p>Putting it together, the step does this:</p>
 <ul>
 <li>Divide each group by its length, which is stored as the group's scale. What is left is a direction, so every group is on the same footing.</li>
-<li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.</li>
+<li>The levels come from <a href="https://en.wikipedia.org/wiki/Lloyd%27s_algorithm">Lloyd's algorithm</a> run on a Gaussian: dense near zero, where most values are, and sparse in the tails. That set is the codebook.<span class="sidenote-wrap"><label for="sn-9" class="sidenote-number"></label><input type="checkbox" id="sn-9" class="sidenote-toggle"><span class="sidenote">Levels built for normally distributed weights are not unique to this project. The NF4 data type in <a href="https://arxiv.org/abs/2305.14314">QLoRA</a> (Dettmers et al., 2023) is designed for zero-centred normal data too, but places its levels at quantiles of the normal distribution, so that each level serves the same expected number of values, rather than with Lloyd's algorithm.</span></span></li>
 <li>Each weight stores the 4-bit index of its nearest level.</li>
 </ul>
 
@@ -814,7 +814,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <p>Here \(\mathbf{w}\) is a group of weights, \(\mathbf{x}\) the matching activations, \(\ell\) the group's length, \(c\) the codebook, and \(\mathrm{idx}_k\) the index stored for weight \(k\). The first equality is exact. The \(\approx\) is where the rounding enters: the stored level only approximates the \(k\)-th entry of \(H\mathbf{w}\), divided by \(\ell\).</p>
 <p>So in practice:</p>
 <ul>
-<li>The kernel rotates the <em>activations</em> once for each block of \(G\) of them and reuses the result for every row of the matrix: thousands of rows share one rotation.</li>
+<li>The kernel rotates the <em>activations</em> once for each block of \(G\) of them and reuses the result for every row of the matrix: thousands of rows share one rotation.<span class="sidenote-wrap"><label for="sn-11" class="sidenote-number"></label><input type="checkbox" id="sn-11" class="sidenote-toggle"><span class="sidenote"><a href="https://arxiv.org/abs/2404.00456">QuaRot</a> splits its rotations the same way: most are folded into the weights ahead of time, and the rest are applied while the model runs, using the fast Walsh–Hadamard transform.</span></span></li>
 <li>The weights stay as indices.</li>
 <li>On the iPod's <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a> unit, one table-lookup instruction (<code>vtbl</code>) turns 8 indices into 8 small integer levels.</li>
 <li>Multiply-accumulate instructions then sum 8 or 16 products at a time.</li>
@@ -866,7 +866,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p>What it costs to store:</p>
 <ul>
-<li>A group of 64 weights takes \(64\times 4\) bits plus one 32-bit length, which is \(\dfrac{64\times 4 + 32}{64} = 4.5\) bits per weight on average, because the one length is shared by all 64.</li>
+<li>A group of 64 weights takes \(64\times 4\) bits plus one 32-bit length, which is \(\dfrac{64\times 4 + 32}{64} = 4.5\) bits per weight on average, because the one length is shared by all 64.<span class="sidenote-wrap"><label for="sn-10" class="sidenote-number"></label><input type="checkbox" id="sn-10" class="sidenote-toggle"><span class="sidenote">QLoRA (see above) has the same overhead: with 32-bit constants and blocks of 64 it pays 32/64 = 0.5 bits per parameter, and its "double quantization" shrinks that to about 0.127 by quantizing the constants as well.</span></span></li>
 <li>SmolLM2 went from 538 MB to 76 MB.</li>
 <li>Whistle is 16.9 MB.</li>
 </ul>
@@ -987,6 +987,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=117" defer></script>
+    <script src="assets/explainer.js?v=118" defer></script>
   </body>
 </html>
