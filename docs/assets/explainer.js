@@ -355,29 +355,40 @@
     draw();
   };
 
-  // 0. Plain quantization: fewer bits, coarser rounding, and what an outlier does to it
+  // 0. Plain quantization: fewer bits, coarser rounding, what an outlier does to it, and the bits themselves
   const quantizeFig = (fig) => {
-    const N = 40, state = { bits: 3, outlier: false }; let seed = 5;
+    const N = 40, SIGMA = 0.05, RANGE = 0.5, state = { bits: 3, outlier: false, sel: 3 }; let seed = 5;
     const rng = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), panel = $(fig, '.sx-bits'), NS = 'http://www.w3.org/2000/svg';
     const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const f32 = (x) => { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, x); return d.getUint32(0).toString(2).padStart(32, '0'); };
+    const boxes = (str, cls) => { const w = el('div', 'sx-bitrow'); [...str].forEach((c, i) => { const b = el('span', 'b ' + (cls instanceof Function ? cls(i) : cls), c); w.append(b); }); return w; };
     const draw = () => {
       const r = rng(seed), g = () => Math.sqrt(-2 * Math.log(r() + 1e-12)) * Math.cos(2 * Math.PI * r());
-      const w = Array.from({ length: N }, g); if (state.outlier) w[Math.floor(r() * N)] = 9 * (r() < .5 ? -1 : 1);
+      const w = Array.from({ length: N }, () => g() * SIGMA); if (state.outlier) w[Math.floor(r() * N)] = 9 * SIGMA * (r() < .5 ? -1 : 1);
       const m = Math.max(...w.map(Math.abs)), n = 2 ** state.bits, step = 2 * m / (n - 1);
-      const levels = Array.from({ length: n }, (_, k) => -m + k * step), nearest = (x) => -m + Math.round((x + m) / step) * step;
-      const X = (x) => 20 + ((x + 9.5) / 19) * 600, big = w.findIndex((x) => Math.abs(x) === m);
+      const idxOf = (x) => Math.round((x + m) / step), levels = Array.from({ length: n }, (_, k) => -m + k * step), nearest = (x) => -m + idxOf(x) * step;
+      const X = (x) => 20 + ((x + RANGE) / (2 * RANGE)) * 600, big = w.findIndex((x) => Math.abs(x) === m);
       const kids = [mk('line', { x1: 20, x2: 620, y1: 112, y2: 112, class: 'axis' })];
       levels.forEach((l) => kids.push(mk('line', { x1: X(l), x2: X(l), y1: 104, y2: 120, class: 'level' })));
       w.forEach((x, i) => {
         const y = 18 + (i % 6) * 13;
         kids.push(mk('line', { x1: X(x), x2: X(nearest(x)), y1: y, y2: 104, class: 'snap' }));
-        kids.push(mk('circle', { cx: X(x), cy: y, r: 4, class: state.outlier && i === big ? 'dot out' : 'dot' }));
+        kids.push(mk('circle', { cx: X(x), cy: y, r: 4, class: (state.outlier && i === big ? 'dot out' : 'dot') + (i === state.sel ? ' sel' : ''), 'data-i': i }));
       });
       svg.replaceChildren(...kids);
       const e2 = w.reduce((a, x) => a + (x - nearest(x)) ** 2, 0), p2 = w.reduce((a, x) => a + x * x, 0);
-      note.textContent = `${state.bits} bit${state.bits > 1 ? 's' : ''} = ${n} levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(2)}.`;
+      note.textContent = `${state.bits} bit${state.bits > 1 ? 's' : ''} = ${n} levels, ${Number((32 / state.bits).toFixed(1))}× smaller than 32-bit floats. Rounding error: ${(Math.sqrt(e2 / p2) * 100).toFixed(0)}% of the weights' own size. Gap between neighbouring levels: ${step.toFixed(3)}.`;
+      const x = w[state.sel], k = idxOf(x), bits = f32(x);
+      panel.replaceChildren(
+        el('p', null, `Selected weight: ${x.toFixed(4)}. As a 32-bit float it is these bits (sign, exponent, mantissa):`),
+        boxes(bits, (i) => (i === 0 ? 's' : i < 9 ? 'e' : 'm')),
+        el('p', null, `Quantized, it is only the number of its nearest level, counting from the left (0 to ${n - 1}). That is ${k}, written in ${state.bits} bit${state.bits > 1 ? 's' : ''}:`),
+        boxes(k.toString(2).padStart(state.bits, '0'), 'i'),
+        el('p', null, `To read it back: level = −m + index × gap = −${m.toFixed(4)} + ${k} × ${step.toFixed(4)} = ${nearest(x).toFixed(4)}. The weight was ${x.toFixed(4)}, so the error is ${Math.abs(x - nearest(x)).toFixed(4)}.`),
+        el('p', null, `All ${N} weights: ${N * 32} bits as floats. Quantized: ${N} × ${state.bits} = ${N * state.bits} bits for the indices, plus m = ${m.toFixed(4)} stored once as a 32-bit float, ${N * state.bits + 32} bits in all.`));
     };
+    svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null) { state.sel = +i; draw(); } });
     $(fig, '[data-k=bits]').addEventListener('input', (e) => { state.bits = +e.target.value; $(fig, '[data-o=bits]').textContent = state.bits; draw(); });
     $(fig, '[data-k=outlier]').addEventListener('click', (e) => { state.outlier = !state.outlier; e.currentTarget.setAttribute('aria-pressed', String(state.outlier)); draw(); });
     $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; draw(); });

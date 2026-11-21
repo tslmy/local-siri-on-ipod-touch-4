@@ -157,3 +157,13 @@
 .sx-gtab { font: .85rem var(--sx-sans); width: 100%; max-width: 30rem; }
 .sx-gtab tr[data-i] { cursor: pointer; }
 .sx-gtab tr.on { background: color-mix(in srgb, var(--accent) 14%, transparent); font-weight: bold; }
+
+/* Figure 0: the bits of one weight */
+.sx-cq .dot { cursor: pointer; }
+.sx-cq .dot.sel { stroke: var(--text); stroke-width: 2; }
+.sx-bits p { margin: .7rem 0 .3rem; font-size: .85rem; color: var(--muted); }
+.sx-bitrow { display: flex; flex-wrap: wrap; gap: 2px; }
+.sx-bitrow .b { width: 1rem; height: 1.4rem; font: .78rem/1.4rem var(--sx-mono); text-align: center; border-radius: 2px; background: color-mix(in srgb, var(--muted) 18%, transparent); }
+.sx-bitrow .b.s { background: var(--sx-red); color: #fff; }
+.sx-bitrow .b.e { background: var(--sx-gold); color: #000; }
+.sx-bitrow .b.i { background: var(--sx-blue); color: #fff; width: 1.4rem; }
