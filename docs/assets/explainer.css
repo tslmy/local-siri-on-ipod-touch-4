@@ -285,3 +285,4 @@
 .sx-tcol { margin-bottom: .5rem; }
 .sx-tcol .sx-hint { margin: .25rem 0 0; }
 .sx-trip .gnum2 { fill: var(--bg); font: bold 8px var(--sx-sans); }
+.sx-gr .olg { fill: none; stroke: var(--text); stroke-width: 1.4; pointer-events: none; }

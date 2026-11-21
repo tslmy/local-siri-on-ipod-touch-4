@@ -32,10 +32,11 @@
     return kids;
   };
   // One block per group, as wide as the group: for the heatmap of the scales. color(r, g) fills it.
-  const matrixGroups = ({ R, C, CW, RH, gs, x0 = 0, rows, color }) => {
+  const matrixGroups = ({ R, C, CW, RH, gs, x0 = 0, rows, color, outline }) => {
     const kids = [], ng = C / gs;
     for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) kids.push(sv('rect', { x: x0 + g * gs * CW, y: r * RH, width: gs * CW + .4, height: RH + .4 }, `fill:${color(r, g)}`));
     kids.push(...gridLines({ R, C, CW, RH, gs, x0, rows: rows === undefined ? ng > 1 : rows }));
+    if (outline) for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) if (outline(r, g)) kids.push(sv('rect', { x: x0 + g * gs * CW + 1, y: r * RH + 1, width: gs * CW - 2, height: RH - 2, class: 'olg' }));   // marks a group, e.g. one that contains an outlier
     return kids;
   };
 
@@ -779,7 +780,7 @@
       const common = { R, C, CW, RH, gs };
       const vb = `0 0 ${C * CW} ${R * RH}`;
       wsvg.setAttribute('viewBox', vb); wsvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => divColor(val(r, c), 3), outline: (r, c) => state.out && outl[r][c], label: (r, g) => st.scales[r][g].mx.toFixed(1) }));
-      ssvg.setAttribute('viewBox', vb); ssvg.replaceChildren(...matrixGroups({ ...common, color: (r, g) => goldColor(st.scales[r][g].mx, gm) }));
+      ssvg.setAttribute('viewBox', vb); ssvg.replaceChildren(...matrixGroups({ ...common, color: (r, g) => goldColor(st.scales[r][g].mx, gm), outline: (r, g) => state.out && outl[r].slice(g * gs, (g + 1) * gs).some((v) => v) }));
       esvg.setAttribute('viewBox', vb); esvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => redColor(st.err[r][c], .5), outline: (r, c) => state.out && outl[r][c] }));
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
