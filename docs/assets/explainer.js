@@ -756,4 +756,8 @@
 
   const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot2d: rot2dFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
+  // LaTeX in the text: \( inline \) and \[ display \], rendered by KaTeX when it has loaded (the raw LaTeX stays readable if it hasn't)
+  window.addEventListener('load', () => {
+    if (window.renderMathInElement) renderMathInElement(document.body, { delimiters: [{ left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }], throwOnError: false });
+  });
 })();

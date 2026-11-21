@@ -247,3 +247,7 @@
 .sx-r2 .cdot { fill: var(--sx-red); }
 .sx-r2 .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
 .sx-r2 .hadt { fill: var(--sx-gold); font-weight: bold; }
+
+/* LaTeX (KaTeX) */
+.siri-explainer .katex { font-size: 1.05em; }
+.siri-explainer .katex-display { margin: .9rem 0; overflow-x: auto; overflow-y: hidden; padding: .2rem 0; }

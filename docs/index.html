@@ -7,7 +7,8 @@
     <meta name="description" content="How the genuine iOS 6 Siri interface was brought to an iPod touch 4th generation and wired to speech recognition and a language model that run on the iPod itself." />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
-    <link rel="stylesheet" href="assets/explainer.css?v=22" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" integrity="sha384-n8MVd4RsNIU0tAv4ct0nTaAbDJwPJzDEaqSD1odI+WdtXRGWt2kTvGFasHpSy3SV" crossorigin="anonymous" />
+    <link rel="stylesheet" href="assets/explainer.css?v=23" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -243,23 +244,23 @@
 <details class="detour">
 <summary>Detour: what exactly is a group, and why along a row?</summary>
 
-<p>A group is a run of consecutive columns inside one row. It never spans rows, and two rows never share a scale. For a weight matrix <code>W</code> with <code>out</code> rows and <code>in</code> columns, and a group size <em>G</em>:</p>
+<p>A group is a run of consecutive columns inside one row. It never spans rows, and two rows never share a scale. For a weight matrix \(W\) with \(\mathrm{out}\) rows and \(\mathrm{in}\) columns, and a group size \(G\):</p>
 <ul>
-<li>Row <em>i</em>, which is one output of the layer, is cut into <code>in / G</code> groups, left to right.</li>
-<li>Group <em>g</em> of row <em>i</em> holds the weights <code>W[i, g·G]</code> to <code>W[i, g·G + G − 1]</code>.</li>
-<li>It has its own scale <code>s[i, g]</code>, so the whole matrix stores <code>out × in / G</code> scales.</li>
+<li>Row \(i\), which is one output of the layer, is cut into \(\mathrm{in}/G\) groups, left to right.</li>
+<li>Group \(g\) of row \(i\) holds the weights \(W_{i,\,gG}\) to \(W_{i,\,gG+G-1}\).</li>
+<li>It has its own scale \(s_{i,g}\), so the whole matrix stores \(\mathrm{out}\times\mathrm{in}/G\) scales.</li>
 </ul>
 <pre>  row i:   W[i,0] … W[i,G−1] | W[i,G] … W[i,2G−1] | …
            └──── group 0 ────┘ └───── group 1 ─────┘
               scale s[i,0]         scale s[i,1]</pre>
 
-<p><strong>Why along a row.</strong> A layer turns the incoming numbers <code>x</code> (the activations) into output <em>i</em> with a dot product along row <em>i</em>:</p>
-<pre>  y[i]  =  Σ_j  W[i,j] · x[j]</pre>
-<p>Each weight is stored as a scale and a level index, <code>W[i,j] ≈ s[i,g] · c[idx[i,j]]</code>, where <code>g = ⌊j / G⌋</code> is the group that column <em>j</em> falls in and <code>c</code> is the list of levels. Put that into the dot product and group the terms by <em>g</em>:</p>
-<pre>  y[i]  =  Σ_g  s[i,g] · ( Σ_{j in group g}  c[idx[i,j]] · x[j] )</pre>
-<p>Inside the brackets every term shares the same scale, so the scale comes out of the sum. The inner sum uses only small level values and the activations, and the scale is multiplied in once per group instead of once per weight. Step 2 adds the rotation <code>H</code>, which acts on the <em>G</em> activations of one column block <code>x_g</code>:</p>
-<pre>  y[i]  =  Σ_g  s[i,g] · ( c[idx[i,g,:]] · (H · x_g) )</pre>
-<p>The rotated activations <code>H · x_g</code> do not depend on <em>i</em>, so they are computed once per column block and reused by every row. That works because every row cuts its columns at the same places.</p>
+<p><strong>Why along a row.</strong> A layer turns the incoming numbers \(x\) (the activations) into output \(i\) with a dot product along row \(i\):</p>
+\[ y_i \;=\; \sum_j W_{ij}\,x_j \]
+<p>Each weight is stored as a scale and a level index, \(W_{ij} \approx s_{i,g}\,c_{\mathrm{idx}_{ij}}\), where \(g=\lfloor j/G\rfloor\) is the group that column \(j\) falls in and \(c\) is the list of levels. Put that into the dot product and group the terms by \(g\):</p>
+\[ y_i \;=\; \sum_g s_{i,g}\Bigl(\sum_{j\,\in\,g} c_{\mathrm{idx}_{ij}}\,x_j\Bigr) \]
+<p>Inside the brackets every term shares the same scale, so the scale comes out of the sum. The inner sum uses only small level values and the activations, and the scale is multiplied in once per group instead of once per weight. Step 2 adds the rotation \(H\), which acts on the \(G\) activations of one column block \(x_g\):</p>
+\[ y_i \;=\; \sum_g s_{i,g}\,\bigl(\mathbf{c}_{i,g}\cdot H x_g\bigr) \]
+<p>Here \(\mathbf{c}_{i,g}\) is the vector of the \(G\) levels chosen in group \(g\) of row \(i\). The rotated activations \(H x_g\) do not depend on \(i\), so they are computed once per column block and reused by every row. That works because every row cuts its columns at the same places.</p>
 
 <p><strong>Other layouts.</strong> Groups could be shaped differently, and the same formula shows what each shape does:</p>
 <div class="wide"><table>
@@ -368,7 +369,11 @@
 <tr><td>128</td><td class="num">8.8%</td></tr>
 </tbody>
 </table></div>
-<p>Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by √n so it keeps lengths). The 2×2 one is [[1, 1], [1, −1]]. Each bigger one is four copies of the previous one, with the bottom-right copy negated:</p>
+<p>Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by \(\sqrt{n}\) so it keeps lengths). The 2×2 one is
+\[ H_2 = \frac{1}{\sqrt{2}}\begin{bmatrix} 1 & 1 \\ 1 & -1 \end{bmatrix} \]
+Each bigger one is four copies of the previous one, with the bottom-right copy negated:
+\[ H_{2n} = \frac{1}{\sqrt{2}}\begin{bmatrix} H_n & H_n \\ H_n & -H_n \end{bmatrix} \]
+Here are the entries of these matrices, before the scaling:</p>
 
 <figure class="widget wide" data-widget="hadamard">
   <figcaption><strong>Building a Walsh–Hadamard matrix by doubling.</strong> Blue is +1, red is −1. Pick a size, then click a row to see what it computes.</figcaption>
@@ -491,8 +496,8 @@
 <li>Instead the kernel uses the fact that rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it.</li>
 </ul>
 <p>What a layer computes is the weights' dot product with the incoming numbers (the activations), and since the rotation is its own inverse:</p>
-<pre>  weights · activations  =  (rotated weights) · (rotated activations)
-                         =  length × Σ codebook[index] × (rotated activations)</pre>
+\[ \mathbf{w}\cdot\mathbf{x} \;=\; (H\mathbf{w})\cdot(H\mathbf{x}) \;=\; \ell\sum_k c_{\mathrm{idx}_k}\,(H\mathbf{x})_k \]
+<p>Here \(\mathbf{w}\) is a group of weights, \(\mathbf{x}\) the matching activations, \(\ell\) the group's length, \(c\) the codebook, and \(\mathrm{idx}_k\) the index stored for weight \(k\).</p>
 <p>So in practice:</p>
 <ul>
 <li>The kernel rotates the <em>activations</em> once per group and reuses them for every row of the matrix: thousands of rows share one rotation.</li>
@@ -600,6 +605,8 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
       </div>
     </article>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
-    <script src="assets/explainer.js?v=22" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
+    <script src="assets/explainer.js?v=23" defer></script>
   </body>
 </html>
