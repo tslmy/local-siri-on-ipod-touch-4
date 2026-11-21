@@ -229,3 +229,20 @@
 .sx-mat table { margin: 0; font: .85rem var(--sx-mono); }
 .sx-mat td { padding: .25rem .6rem; border: 1px solid var(--sx-rule); }
 .sx-mat .sx-note { margin: 0; min-height: 0; }
+
+/* Figure 6-: rotating points in 2D */
+.sx-r2 { width: 100%; height: auto; display: block; }
+.sx-r2 .sph { fill: none; stroke: var(--sx-rule); stroke-dasharray: 3 4; }
+.sx-r2 .ax { stroke: var(--muted); stroke-width: 1; }
+.sx-r2 .sq { fill: none; stroke: var(--sx-gold); stroke-width: 1.4; }
+.sx-r2 .gd { fill: var(--muted); opacity: .6; }
+.sx-r2 .pt { fill: var(--sx-blue); cursor: pointer; }
+.sx-r2 .pt.sel { stroke: var(--text); stroke-width: 2; }
+.sx-r2 .snap3 { stroke: var(--sx-red); stroke-width: 2; }
+.sx-r2 .qpt { fill: none; stroke: var(--sx-red); stroke-width: 2; }
+.sx-r2 .crv { fill: none; stroke: var(--sx-blue); stroke-width: 2; }
+.sx-r2 .hadl { stroke: var(--sx-gold); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.sx-r2 .cur { stroke: var(--muted); stroke-width: 1; }
+.sx-r2 .cdot { fill: var(--sx-red); }
+.sx-r2 .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+.sx-r2 .hadt { fill: var(--sx-gold); font-weight: bold; }

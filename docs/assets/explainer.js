@@ -294,6 +294,52 @@
     draw();
   };
 
+  // 6-. Rotating points in 2D, where the Hadamard matrix is exactly a 45 degree rotation (outputs swapped)
+  const rot2dFig = (fig) => {
+    const CX = 165, CY = 150, S = 118, state = { deg: 0, sel: 0 }; let seed = 4, pts = [];
+    const rng = (sd) => () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-readout'), NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const gen = () => { const r = rng(seed); pts = []; for (let k = 0; k < 4; k++) for (let j = 0; j < 3; j++) { const a = (k * 90 + (r() - .5) * 20) * Math.PI / 180; pts.push([Math.cos(a), Math.sin(a)]); } state.sel = 0; };
+    const turn = (p, d) => { const c = Math.cos(d * Math.PI / 180), s = Math.sin(d * Math.PI / 180); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c]; };
+    const quant = (p) => { const m = Math.max(...p.map(Math.abs)), st = 2 * m / 3, q = p.map((x) => -m + Math.round((x + m) / st) * st); return { m, q, err: Math.hypot(p[0] - q[0], p[1] - q[1]) / Math.hypot(...p) }; };
+    const avg = (d) => pts.reduce((a, p) => a + quant(turn(p, d)).err, 0) / pts.length;
+    const spike = (d) => pts.reduce((a, p) => { const q = turn(p, d); return a + Math.max(Math.abs(q[0]), Math.abs(q[1])) / Math.hypot(...q); }, 0) / pts.length;
+    const X = (x) => CX + S * x, Y = (y) => CY - S * y;
+    const draw = () => {
+      const P = pts.map((p) => turn(p, state.deg)), sel = P[state.sel], { m, q, err } = quant(sel), kids = [];
+      const line = (x1, y1, x2, y2, cls) => mk('line', { x1, y1, x2, y2, class: cls });
+      kids.push(mk('circle', { cx: CX, cy: CY, r: S, class: 'sph' }), line(X(-1.3), Y(0), X(1.3), Y(0), 'ax'), line(X(0), Y(-1.3), X(0), Y(1.3), 'ax'));
+      kids.push(mk('rect', { x: X(-m), y: Y(m), width: 2 * m * S, height: 2 * m * S, class: 'sq' }));
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) kids.push(mk('circle', { cx: X(-m + a * 2 * m / 3), cy: Y(-m + b * 2 * m / 3), r: 2, class: 'gd' }));
+      kids.push(line(X(sel[0]), Y(sel[1]), X(q[0]), Y(q[1]), 'snap3'));
+      P.forEach((p, i) => kids.push(mk('circle', { cx: X(p[0]), cy: Y(p[1]), r: 5.5, class: 'pt' + (i === state.sel ? ' sel' : ''), 'data-i': i })));
+      kids.push(mk('circle', { cx: X(q[0]), cy: Y(q[1]), r: 3.5, class: 'qpt' }));
+      // error against angle, with the Hadamard angle marked
+      const x0 = 410, x1 = 620, y0 = 250, y1 = 50, curve = Array.from({ length: 91 }, (_, d) => spike(d)), lo = .65, top = 1.02;
+      const CXa = (d) => x0 + (x1 - x0) * d / 90, CYa = (e) => y0 - (y0 - y1) * (e - lo) / (top - lo), txt = (x, y, str, anchor, cls) => { const t = mk('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
+      kids.push(line(x0, y0, x1, y0, 'ax'), line(x0, y0, x0, y1, 'ax'), line(CXa(45), y0, CXa(45), y1, 'hadl'));
+      kids.push(mk('polyline', { points: curve.map((e, d) => `${CXa(d)},${CYa(e)}`).join(' '), class: 'crv' }));
+      kids.push(line(CXa(state.deg), y0, CXa(state.deg), y1, 'cur'), mk('circle', { cx: CXa(state.deg), cy: CYa(curve[state.deg]), r: 4.5, class: 'cdot' }));
+      [0, 45, 90].forEach((d) => kids.push(txt(CXa(d), y0 + 15, d + '°', 'middle')));
+      [.7, .85, 1].forEach((v) => kids.push(line(x0 - 4, CYa(v), x0, CYa(v), 'ax'), txt(x0 - 8, CYa(v) + 4, (v * 100).toFixed(0) + '%', 'end')));
+      kids.push(txt(CXa(45), y1 - 8, 'Hadamard', 'middle', 'lbl hadt'), txt(x0 - 40, y1 - 24, 'largest weight ÷ length (average)', 'start'), txt((x0 + x1) / 2, y0 + 30, 'rotation angle', 'middle'));
+      svg.replaceChildren(...kids);
+      note.textContent = `Rotated ${state.deg}°. Point ${state.sel + 1}: (${sel[0].toFixed(2)}, ${sel[1].toFixed(2)}), largest coordinate ${(m * 100).toFixed(0)}% of its length, rounding error ${(err * 100).toFixed(0)}%. Average over the 12 points: largest weight ${(curve[state.deg] * 100).toFixed(0)}% of the length (${(curve[0] * 100).toFixed(0)}% before rotating, ${(curve[45] * 100).toFixed(0)}% at 45°), rounding error ${(avg(state.deg) * 100).toFixed(0)}% (${(avg(0) * 100).toFixed(0)}% before, ${(avg(45) * 100).toFixed(0)}% at 45°).`;
+      const c = Math.cos(state.deg * Math.PI / 180), sn = Math.sin(state.deg * Math.PI / 180), h = Math.SQRT1_2, box = $(fig, '.sx-mat');
+      const tbl = (M) => { const t = el('table'); M.forEach((row) => { const tr = el('tr'); row.forEach((v) => { const td = el('td', 'num', (v < 0 ? '−' : '') + Math.abs(v).toFixed(2)); td.style.background = `color-mix(in srgb, var(--sx-gold) ${Math.abs(v) * 70}%, transparent)`; tr.append(td); }); t.append(tr); }); return t; };
+      const lab = (t) => el('span', 'sx-note', t);
+      box.replaceChildren(lab('rotation by this angle'), tbl([[c, -sn], [sn, c]]), lab('Hadamard matrix'), tbl([[h, h], [h, -h]]), lab(state.deg === 45 ? 'At 45° the rotation has the same entries as the Hadamard matrix, with its two rows swapped.' : ''));
+    };
+    const set = (d) => { state.deg = d; $(fig, '[data-k=deg]').value = d; $(fig, '[data-o=deg]').textContent = d + '°'; draw(); };
+    $(fig, '[data-k=deg]').addEventListener('input', (e) => set(+e.target.value));
+    $(fig, '[data-act=had]').addEventListener('click', () => set(45));
+    $(fig, '[data-act=reset]').addEventListener('click', () => set(0));
+    $(fig, '[data-act=new]').addEventListener('click', () => { seed = (seed * 48271) % 2147483647; gen(); draw(); });
+    svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null) { state.sel = +i; draw(); } });
+    gen(); set(0);
+  };
+
   // 6a. Rotating points in 3D: the cube of levels shrinks as spikes flatten
   const rot3dFig = (fig) => {
     const S = 128, CX = 320, CY = 172, NAMES = ['A', 'B', 'C', 'D'];
@@ -701,6 +747,6 @@
     info.textContent = 'Hover a cell to see its group.'; gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot2d: rot2dFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();
