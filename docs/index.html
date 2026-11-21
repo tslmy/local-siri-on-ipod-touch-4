@@ -722,9 +722,9 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p id="step-4" data-toc="Step 4: never rebuild the weights"><strong>Step 4: never rebuild the weights.</strong></p>
 <ul>
-<li>To use a weight you'd normally decode it: look up its level, multiply by the length, rotate back.</li>
-<li>Doing that for 135 million weights per word would be slow.</li>
-<li>Instead the kernel uses the fact that rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it.</li>
+<li><strong>The problem:</strong> steps 2 and 3 store rotated, rounded weights. To use one you'd normally decode it: look up its level, multiply by the length, rotate back.</li>
+<li>Doing that for 135 million weights per word would be slow on a 2010 CPU, and it would rebuild the full-size weights we worked to avoid keeping.</li>
+<li><strong>The way out:</strong> a layer only needs dot products, and rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it. So rotate the other side, the activations, instead, and never touch the weights.</li>
 </ul>
 <p>What a layer computes is the weights' dot product with the incoming numbers (the activations), and since the rotation is its own inverse:</p>
 \[ \mathbf{w}\cdot\mathbf{x} \;=\; (H\mathbf{w})\cdot(H\mathbf{x}) \;=\; \ell\sum_k c_{\mathrm{idx}_k}\,(H\mathbf{x})_k \]
