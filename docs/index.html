@@ -655,7 +655,103 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 
-<p>Steps 1 and 2 left us with a problem we can now solve. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat most of the savings (the numbers are in "Taking stock" below).</p>
+<p>Step 2 leaves every group rotated but still at its own length. Here are four such groups of two weights, as points. With the plain scheme from step 1, each needs a grid of levels sized to its own largest weight:</p>
+
+<figure class="widget wide">
+  <figcaption><strong>Rotated groups, each with its own grid.</strong> Four groups of two weights after rotation, and the 4 × 4 grid of levels that would be built around each one.</figcaption>
+  <svg class="sx-sz" viewBox="0 0 640 340" role="img" aria-label="Four groups of two weights as points, each surrounded by its own square grid of 16 quantization levels, in four different sizes">
+  <line x1="25.0" y1="170" x2="325.0" y2="170" style="stroke:var(--muted);stroke-width:1"/>
+  <line x1="175" y1="320.0" x2="175" y2="20.0" style="stroke:var(--muted);stroke-width:1"/>
+  <text x="331.0" y="174" class="lbl">w₁</text><text x="181" y="16.0" class="lbl">w₂</text>
+  <rect x="48.9" y="43.9" width="252.3" height="252.3" style="fill:none;stroke:var(--pc3);stroke-width:1.6"/>
+  <circle cx="48.9" cy="296.1" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="48.9" cy="212.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="48.9" cy="128.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="48.9" cy="43.9" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="133.0" cy="296.1" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="133.0" cy="212.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="133.0" cy="128.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="133.0" cy="43.9" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="217.0" cy="296.1" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="217.0" cy="212.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="217.0" cy="128.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="217.0" cy="43.9" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="301.1" cy="296.1" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="301.1" cy="212.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="301.1" cy="128.0" r="2.4" style="fill:var(--pc3)"/>
+  <circle cx="301.1" cy="43.9" r="2.4" style="fill:var(--pc3)"/>
+  <rect x="76.1" y="71.1" width="197.7" height="197.7" style="fill:none;stroke:var(--pc2);stroke-width:1.6"/>
+  <circle cx="76.1" cy="268.9" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="76.1" cy="203.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="76.1" cy="137.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="76.1" cy="71.1" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="142.0" cy="268.9" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="142.0" cy="203.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="142.0" cy="137.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="142.0" cy="71.1" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="208.0" cy="268.9" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="208.0" cy="203.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="208.0" cy="137.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="208.0" cy="71.1" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="273.9" cy="268.9" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="273.9" cy="203.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="273.9" cy="137.0" r="2.4" style="fill:var(--pc2)"/>
+  <circle cx="273.9" cy="71.1" r="2.4" style="fill:var(--pc2)"/>
+  <rect x="110.2" y="105.2" width="129.5" height="129.5" style="fill:none;stroke:var(--pc1);stroke-width:1.6"/>
+  <circle cx="110.2" cy="234.8" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="110.2" cy="191.6" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="110.2" cy="148.4" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="110.2" cy="105.2" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="153.4" cy="234.8" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="153.4" cy="191.6" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="153.4" cy="148.4" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="153.4" cy="105.2" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="196.6" cy="234.8" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="196.6" cy="191.6" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="196.6" cy="148.4" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="196.6" cy="105.2" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="239.8" cy="234.8" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="239.8" cy="191.6" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="239.8" cy="148.4" r="2.4" style="fill:var(--pc1)"/>
+  <circle cx="239.8" cy="105.2" r="2.4" style="fill:var(--pc1)"/>
+  <rect x="144.3" y="139.3" width="61.4" height="61.4" style="fill:none;stroke:var(--pc0);stroke-width:1.6"/>
+  <circle cx="144.3" cy="200.7" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="144.3" cy="180.2" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="144.3" cy="159.8" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="144.3" cy="139.3" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="164.8" cy="200.7" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="164.8" cy="180.2" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="164.8" cy="159.8" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="164.8" cy="139.3" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="185.2" cy="200.7" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="185.2" cy="180.2" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="185.2" cy="159.8" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="185.2" cy="139.3" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="205.7" cy="200.7" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="205.7" cy="180.2" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="205.7" cy="159.8" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="205.7" cy="139.3" r="2.4" style="fill:var(--pc0)"/>
+  <circle cx="205.7" cy="149.5" r="9" style="fill:var(--bg);stroke:var(--pc0);stroke-width:2.4"/><text x="205.7" y="153.0" text-anchor="middle" style="fill:var(--text);font:bold 10px var(--sx-sans)">1</text>
+  <circle cx="110.2" cy="118.9" r="9" style="fill:var(--bg);stroke:var(--pc1);stroke-width:2.4"/><text x="110.2" y="122.4" text-anchor="middle" style="fill:var(--text);font:bold 10px var(--sx-sans)">2</text>
+  <circle cx="273.9" cy="251.8" r="9" style="fill:var(--bg);stroke:var(--pc2);stroke-width:2.4"/><text x="273.9" y="255.3" text-anchor="middle" style="fill:var(--text);font:bold 10px var(--sx-sans)">3</text>
+  <circle cx="48.9" cy="279.1" r="9" style="fill:var(--bg);stroke:var(--pc3);stroke-width:2.4"/><text x="48.9" y="282.6" text-anchor="middle" style="fill:var(--text);font:bold 10px var(--sx-sans)">4</text>
+  <text x="360" y="38" class="lbl rowname" style="fill:var(--text);font-weight:bold">One grid per group</text>
+  <text x="360" y="56" class="lbl">Each square reaches its group's largest weight,</text>
+  <text x="360" y="72" class="lbl">and its 16 dots are that group's levels.</text>
+  <rect x="360" y="94" width="12" height="12" style="fill:none;stroke:var(--pc0);stroke-width:1.6"/>
+  <text x="380" y="104" class="lbl" style="fill:var(--text)">Group 1: (0.45, 0.3), gap between levels 0.30</text>
+  <rect x="360" y="118" width="12" height="12" style="fill:none;stroke:var(--pc1);stroke-width:1.6"/>
+  <text x="380" y="128" class="lbl" style="fill:var(--text)">Group 2: (-0.95, 0.75), gap between levels 0.63</text>
+  <rect x="360" y="142" width="12" height="12" style="fill:none;stroke:var(--pc2);stroke-width:1.6"/>
+  <text x="380" y="152" class="lbl" style="fill:var(--text)">Group 3: (1.45, -1.2), gap between levels 0.97</text>
+  <rect x="360" y="166" width="12" height="12" style="fill:none;stroke:var(--pc3);stroke-width:1.6"/>
+  <text x="380" y="176" class="lbl" style="fill:var(--text)">Group 4: (-1.85, -1.6), gap between levels 1.23</text>
+  <text x="360" y="218" class="lbl">Four groups, four different grids:</text>
+  <text x="360" y="234" class="lbl">every group would have to carry its own levels.</text>
+  </svg>
+</figure>
+
+<p>That is the problem steps 1 and 2 leave us with, and we can now solve it. Evenly spaced levels are a poor fit for rotated weights, and storing a fresh set of levels for every group would eat most of the savings (the numbers are in "Taking stock" below).</p>
 
 <p>The arithmetic is short. Take groups of \(G\) weights, \(b\)-bit indices, and \(c\)-bit numbers (\(c = 32\) here). Anything stored once for the whole model is negligible, so what counts is what is stored for every group:</p>
 \[ \begin{aligned} \text{shared codebook:}\quad & b + \frac{c}{G} \\ \text{fresh codebook per group:}\quad & b + \frac{2^b\,c}{G} \end{aligned} \]
@@ -971,6 +1067,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=101" defer></script>
+    <script src="assets/explainer.js?v=102" defer></script>
   </body>
 </html>
