@@ -416,7 +416,7 @@
           grid(o.m, `fill:${col(i)}`, 1.8);
         });
         else { kids.push(square(FLAT, 'stroke:var(--sx-gold);stroke-width:1.6')); grid(FLAT, 'fill:var(--muted)', 2); }
-        P.forEach((p, i) => {                              // a curved arrow from each group to the grid point it is stored as: it bows toward the middle, off the square's edge that the dot sits on
+        if (!has('trail')) P.forEach((p, i) => {           // a curved arrow from each group to the grid point it is stored as: it bows toward the middle, off the square's edge that the dot sits on
           const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 22) return;
           const mx = (x1 + x2) / 2, my = (y1 + y2) / 2; let nx = -(y2 - y1) / d, ny = (x2 - x1) / d; if (nx * (CX - mx) + ny * (CY - my) < 0) { nx = -nx; ny = -ny; }
           const bow = Math.min(.45 * d, 22), cx = mx + nx * bow * 2, cy = my + ny * bow * 2;      // the control point of a quadratic curve sits twice as far out as the curve's middle
@@ -432,14 +432,20 @@
         const o = Q[rot.sel], st = 2 * o.m / 3;
         for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); }
       }
-      if (has('quant')) Q.forEach((o, i) => {            // a hollow marker where each group is stored: the dot moved there
+      if (has('quant') && !has('trail')) Q.forEach((o, i) => {   // a hollow marker where each group is stored: the dot moved there
         const [x, y] = pt(o.q[0], o.q[1]), [px, py] = pt(P[i][0], P[i][1]);
         kids.push(shape(grp[i].outlier, x, y, 8, 'dest', `stroke:${col(i)};stroke-width:${i === rot.sel ? 3 : 2}`));
         if (Math.hypot(x - px, y - py) >= 22) kids.push(word(x, y + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', `fill:${col(i)};dominant-baseline:central`));
       });
       if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(shape(grp[i].outlier, cx, cy, 7, 'ghost', `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
-      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(shape(grp[i].outlier, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
-      P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(word(cx, cy + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
+      const trail = has('trail');                        // with a trail, each group is drawn once, where it is stored, with fading shadows back along the way it moved from its real weights
+      if (trail) P.forEach((p, i) => {
+        const [x1, y1] = pt(p[0], p[1]), [x2, y2] = pt(Q[i].q[0], Q[i].q[1]), d = Math.hypot(x2 - x1, y2 - y1); if (d < 4) return;
+        const n = Math.max(3, Math.min(7, Math.round(d / 8)));
+        for (let k = 0; k < n; k++) { const t = k / n; kids.push(shape(grp[i].outlier, x1 + (x2 - x1) * t, y1 + (y2 - y1) * t, 8, 'shadow', `fill:${col(i)};opacity:${(.12 + .5 * t).toFixed(2)}`)); }   // the faintest one is where the group really is
+      });
+      P.forEach((p, i) => { const at = trail ? Q[i].q : p, [cx, cy] = pt(at[0], at[1]); kids.push(shape(grp[i].outlier, cx, cy, 8, 'pt' + (i === rot.sel ? ' sel' : ''), `fill:${col(i)}`, { 'data-i': i })); });
+      P.forEach((p, i) => { const at = trail ? Q[i].q : p, [cx, cy] = pt(at[0], at[1]); kids.push(word(cx, cy + inside(grp[i].outlier), i + 1, 'middle', 'lbl gnum', 'fill:var(--bg);dominant-baseline:central')); });   // the group's number, inside its marker
       if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 12 : -12), y + (below ? 18 : -11), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // the stored value of each group; flips inwards near the edges so the label stays in view
       let curves = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle: one curve for each kind of group
