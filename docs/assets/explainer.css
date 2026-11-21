@@ -171,3 +171,16 @@
 .sx-cq .bn { fill: var(--muted); font: 10px var(--sx-mono); }
 .sx-cq .selk { fill: var(--accent); font-weight: bold; }
 .sx-gr .olc { fill: none; stroke: var(--sx-gold); stroke-width: 1.5; pointer-events: none; }
+
+/* Figure 6a: rotating points in 3D */
+.sx-r3 { width: 100%; height: auto; display: block; touch-action: none; cursor: grab; }
+.sx-r3 .sph { fill: none; stroke: var(--sx-rule); stroke-dasharray: 3 4; }
+.sx-r3 .ax { stroke: var(--muted); stroke-width: 1; }
+.sx-r3 .cube { stroke: var(--sx-gold); stroke-width: 1.2; opacity: .8; }
+.sx-r3 .gd { fill: var(--muted); opacity: .6; }
+.sx-r3 .ray { stroke: var(--sx-blue); stroke-width: 1; opacity: .35; }
+.sx-r3 .pt { fill: var(--sx-blue); cursor: pointer; }
+.sx-r3 .pt.sel { stroke: var(--text); stroke-width: 2; }
+.sx-r3 .snap3 { stroke: var(--sx-red); stroke-width: 2; }
+.sx-r3 .qpt { fill: none; stroke: var(--sx-red); stroke-width: 2; }
+.sx-r3 .lbl { fill: var(--muted); font: 11px var(--sx-sans); }

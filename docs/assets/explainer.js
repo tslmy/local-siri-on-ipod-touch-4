@@ -264,6 +264,69 @@
     draw();
   };
 
+  // 6a. Rotating points in 3D: the cube of levels shrinks as spikes flatten
+  const rot3dFig = (fig) => {
+    const S = 128, CX = 320, CY = 172, NAMES = ['A', 'B', 'C', 'D'];
+    const norm3 = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
+    const base = [[1, 0.1, 0.05], [0.08, -1, 0.1], [0.1, 0.05, 1], [0.5, 0.5, 0.7]].map(norm3);
+    const state = { deg: 0, sel: 0, yaw: -0.6, pitch: 0.4 };
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note'), NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs) => { const e = document.createElementNS(NS, tag); Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v)); return e; };
+    const rotate = (v, deg) => {                       // Rodrigues' formula about the diagonal (1,1,1)
+      const a = 1 / Math.sqrt(3), c = Math.cos(deg * Math.PI / 180), s = Math.sin(deg * Math.PI / 180);
+      const d = a * (v[0] + v[1] + v[2]), cr = [a * (v[2] - v[1]), a * (v[0] - v[2]), a * (v[1] - v[0])];
+      return [0, 1, 2].map((i) => v[i] * c + cr[i] * s + a * d * (1 - c));
+    };
+    const proj = (p) => {
+      const cy = Math.cos(state.yaw), sy = Math.sin(state.yaw), cp = Math.cos(state.pitch), sp = Math.sin(state.pitch);
+      const x1 = p[0] * cy - p[1] * sy, y1 = p[0] * sy + p[1] * cy;
+      return [CX + S * x1, CY - S * (p[2] * cp + y1 * sp)];
+    };
+    const quant = (p) => {                             // 4 levels per axis, spanning the point's largest coordinate
+      const m = Math.max(...p.map(Math.abs)), step = 2 * m / 3;
+      const q = p.map((x) => -m + Math.round((x + m) / step) * step);
+      return { m, step, q, err: Math.hypot(...p.map((x, i) => x - q[i])) / Math.hypot(...p) };
+    };
+    const line = (a, b, cls) => { const [x1, y1] = proj(a), [x2, y2] = proj(b); return mk('line', { x1, y1, x2, y2, class: cls }); };
+    const draw = () => {
+      const pts = base.map((p) => rotate(p, state.deg)), sel = pts[state.sel], { m, q, err } = quant(sel), kids = [];
+      kids.push(mk('circle', { cx: CX, cy: CY, r: S, class: 'sph' }));
+      [[1.3, 0, 0, 'w₁'], [0, 1.3, 0, 'w₂'], [0, 0, 1.3, 'w₃']].forEach(([x, y, z, t]) => {
+        kids.push(line([-x, -y, -z], [x, y, z], 'ax'));
+        const [px, py] = proj([x * 1.06, y * 1.06, z * 1.06]), tx = mk('text', { x: px, y: py, class: 'lbl', 'text-anchor': 'middle' }); tx.textContent = t; kids.push(tx);
+      });
+      const C = [[-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1], [-1, -1, 1], [1, -1, 1], [1, 1, 1], [-1, 1, 1]].map((c) => c.map((x) => x * m));
+      [[0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [5, 6], [6, 7], [7, 4], [0, 4], [1, 5], [2, 6], [3, 7]].forEach(([i, j]) => kids.push(line(C[i], C[j], 'cube')));
+      for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) for (let c = 0; c < 4; c++) {
+        const [x, y] = proj([-m + a * 2 * m / 3, -m + b * 2 * m / 3, -m + c * 2 * m / 3]); kids.push(mk('circle', { cx: x, cy: y, r: 1.5, class: 'gd' }));
+      }
+      kids.push(line(sel, q, 'snap3'));
+      pts.forEach((p, i) => {
+        kids.push(line([0, 0, 0], p, 'ray'));
+        const [x, y] = proj(p); kids.push(mk('circle', { cx: x, cy: y, r: 6, class: 'pt' + (i === state.sel ? ' sel' : ''), 'data-i': i }));
+        const t = mk('text', { x: x + 9, y: y - 8, class: 'lbl' }); t.textContent = NAMES[i]; kids.push(t);
+      });
+      const [qx, qy] = proj(q); kids.push(mk('circle', { cx: qx, cy: qy, r: 3.5, class: 'qpt' }));
+      svg.replaceChildren(...kids);
+      const errs = (d) => base.map((p) => quant(rotate(p, d)).err), avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+      note.textContent = `Rotated ${state.deg}°. Point ${NAMES[state.sel]}: (${sel.map((x) => x.toFixed(2)).join(', ')}). Its largest coordinate is ${(m * 100).toFixed(0)}% of its length, so its rounding error is ${(err * 100).toFixed(0)}%. `
+        + `Average over the four points: ${(avg(errs(state.deg)) * 100).toFixed(0)}% (${(avg(errs(0)) * 100).toFixed(0)}% before rotating).`;
+    };
+    const set = (d) => { state.deg = d; $(fig, '[data-k=deg]').value = d; $(fig, '[data-o=deg]').textContent = d + '°'; draw(); };
+    $(fig, '[data-k=deg]').addEventListener('input', (e) => set(+e.target.value));
+    $(fig, '[data-act=flat]').addEventListener('click', () => set(60));
+    $(fig, '[data-act=reset]').addEventListener('click', () => set(0));
+    let drag = null;
+    svg.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: state.yaw, pitch: state.pitch, moved: false }; });
+    window.addEventListener('pointermove', (e) => {
+      if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      if (drag.moved) { state.yaw = drag.yaw + dx * 0.01; state.pitch = Math.max(0.05, Math.min(1.4, drag.pitch + dy * 0.01)); draw(); }
+    });
+    window.addEventListener('pointerup', () => { setTimeout(() => { drag = null; }, 0); });
+    svg.addEventListener('click', (e) => { const i = e.target.dataset && e.target.dataset.i; if (i != null && !(drag && drag.moved)) { state.sel = +i; draw(); } });
+    set(0);
+  };
+
   // 7. Rotation spreads outliers: bars and histograms before and after
   const spreadFig = (fig) => {
     const rng = (seed) => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -493,6 +556,6 @@
     info.textContent = 'Hover a cell to see its group.'; gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot3d: rot3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
 })();

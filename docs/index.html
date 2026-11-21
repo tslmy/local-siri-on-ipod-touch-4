@@ -7,7 +7,7 @@
     <meta name="description" content="How the genuine iOS 6 Siri interface was brought to an iPod touch 4th generation and wired to speech recognition and a language model that run on the iPod itself." />
     <meta name="color-scheme" content="light dark" />
     <link rel="stylesheet" href="assets/site.css" />
-    <link rel="stylesheet" href="assets/explainer.css?v=8" />
+    <link rel="stylesheet" href="assets/explainer.css?v=9" />
   </head>
   <body>
     <header class="site"><a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">local-siri-on-ipod-touch-4</a></header>
@@ -231,7 +231,22 @@
   <table class="sx-gtab"></table>
 </figure>
 
-<p><strong>Step 2: rotate the group.</strong> Before choosing levels, the group is multiplied by a <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by √n so it keeps lengths). The 2×2 one is [[1, 1], [1, −1]]. Each bigger one is four copies of the previous one, with the bottom-right copy negated:</p>
+<p><strong>Step 2: rotate the group.</strong> Grouping keeps an outlier from spoiling its whole row, but inside its own group it still stretches the levels for the other 63 weights. What matters is how spiky the group is: its largest weight compared with the group's overall size, which is its length. You can't remove a spike without changing the weights, but you can change the axes you write them against.</p>
+
+<p>Picture a group of just three weights as a point in 3D space, one weight per axis. The 2-bit levels, four per axis, form a grid inside a cube that just reaches the point's largest coordinate. A point close to an axis has one big weight and two tiny ones, so the cube must be as large as the point is long, and the grid is coarse. Rotate the point, which is the same as writing it against rotated axes, and the same point with the same length has no dominant coordinate. The cube shrinks, the grid around the point gets finer, and the rounding error drops. Click a point to see its grid, drag the background to look around, and turn the slider:</p>
+
+<figure class="widget wide" data-widget="rot3d">
+  <figcaption><strong>Rotating four groups of three weights.</strong> Each dot is one group, a point on a sphere of length 1. The cube is the range its levels must cover, with 4 levels per axis (2 bits), and the gold line goes from the point to the level it rounds to. Rotating about the diagonal by 60° turns every axis-aligned spike into a flatter point; at 120° the points are spiky again.</figcaption>
+  <div class="sx-controls">
+    <label>Rotate <input type="range" min="0" max="120" step="1" value="0" data-k="deg"> <output data-o="deg"></output></label>
+    <button data-act="flat">60° (flattest)</button>
+    <button data-act="reset">reset</button>
+  </div>
+  <svg class="sx-r3" viewBox="0 0 640 330" role="img" aria-label="Four points in three dimensions with the cube of quantization levels around the selected point"></svg>
+  <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
+</figure>
+
+<p>Two things make this safe. A rotation keeps every point's length and can be undone exactly by rotating back, so no information is lost, and the rounding error is the same size whichever side you measure it on. It also costs no bits to store. With three weights there isn't much room: the largest coordinate falls from 100% of the length to about two thirds. With 64 weights there is a lot more: a single spike spread evenly over 64 outputs ends up at 1/8 of the length in each. Many rotations would do this. Whistle uses one that needs no multiplications and no stored matrix, the <a href="https://en.wikipedia.org/wiki/Hadamard_matrix">Walsh–Hadamard matrix</a>. That's a square matrix whose entries are all +1 or −1 (divided by √n so it keeps lengths). The 2×2 one is [[1, 1], [1, −1]]. Each bigger one is four copies of the previous one, with the bottom-right copy negated:</p>
 
 <figure class="widget wide" data-widget="hadamard">
   <figcaption><strong>Building a Walsh–Hadamard matrix by doubling.</strong> Blue is +1, red is −1. Pick a size, then click a row to see what it computes.</figcaption>
@@ -372,6 +387,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
       </div>
     </article>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
-    <script src="assets/explainer.js?v=8" defer></script>
+    <script src="assets/explainer.js?v=9" defer></script>
   </body>
 </html>
