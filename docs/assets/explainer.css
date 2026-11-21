@@ -259,3 +259,14 @@
 .siri-explainer figure.widget .callout { margin-top: 1rem; }
 .siri-explainer figure.widget .callout ul { margin: .5rem 0; padding-left: 1.2rem; }
 .sx-r2 .ghost { fill: none; stroke: var(--muted); stroke-width: 1; opacity: .7; pointer-events: none; }
+
+/* Option cards: a few-word heading with its description inside the toggle */
+.siri-explainer figure.widget .sx-rowlabel.sx-block { display: block; margin: 1rem 0 .4rem; min-width: 0; }
+.sx-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: .6rem; margin: 0 0 .8rem; }
+.siri-explainer figure.widget .sx-opts button { display: block; text-align: left; margin: 0; padding: .6rem .8rem; border: 1px solid var(--sx-rule); border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: .85rem; line-height: 1.4; }
+.siri-explainer figure.widget .sx-opts button::before, .siri-explainer figure.widget .sx-opts button::after { display: none; }
+.siri-explainer figure.widget .sx-opts button:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.siri-explainer figure.widget .sx-opts button strong { display: block; margin-bottom: .15rem; font-size: .95rem; }
+.siri-explainer figure.widget .sx-opts button span { color: var(--muted); }
+.siri-explainer figure.widget .sx-opts button[aria-pressed=true] { background: color-mix(in srgb, var(--text) 12%, var(--bg)); border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.siri-explainer figure.widget .sx-hint { color: var(--muted); font-size: .85rem; margin: .1rem 0 .6rem; }
