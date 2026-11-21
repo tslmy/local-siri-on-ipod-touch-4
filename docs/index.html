@@ -410,26 +410,24 @@
 <details class="detour">
 <summary>Detour: how is this different from PCA?</summary>
 
-<p>If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a>, this rotation may look familiar. PCA is also a rotation, but with the opposite goal:</p>
+<p>If you have met <a href="https://en.wikipedia.org/wiki/Principal_component_analysis">principal component analysis</a> (PCA), this may look familiar, because PCA is also a rotation. But what we are trying to do is exactly the opposite of PCA. PCA looks for the angle that makes data points more spiky, so that most of the information sits in a few coordinates. We look for the angle that flattens them instead:</p>
 <div class="wide"><table>
-<thead><tr><th></th><th>PCA</th><th>Hadamard matrix (introduced right after this detour)</th></tr></thead>
+<thead><tr><th></th><th>PCA</th><th>What we want</th></tr></thead>
 <tbody>
-<tr><td>Chosen from</td><td>The data: the directions many vectors vary along most</td><td>Nothing, it is fixed</td></tr>
-<tr><td>Effect</td><td>Piles the energy into a few coordinates</td><td>Spreads the energy evenly over all coordinates</td></tr>
-<tr><td>Good for</td><td>Compressing by dropping the small coordinates</td><td>Rounding, where a dominant coordinate is the outlier we want to avoid</td></tr>
-<tr><td>Needs</td><td>A rotation fitted to each layer's data, and stored</td><td>No stored matrix</td></tr>
-<tr><td>Fast form</td><td>A general matrix multiply</td><td>Add-and-subtract butterfly (step 4)</td></tr>
+<tr><td>Goal</td><td>Make groups spikier: line the axes up with the directions the data varies along most, so the energy piles into a few coordinates</td><td>Make groups flatter: turn spikes away from the axes, so the energy spreads over all coordinates</td></tr>
+<tr><td>Good for</td><td>Compressing, by dropping the small coordinates</td><td>Rounding, where one dominant coordinate stretches the levels for all the others</td></tr>
+<tr><td>In short</td><td>The best angle to concentrate the data</td><td>The best angle to flatten it</td></tr>
 </tbody>
 </table></div>
-<p>Here are both, applied to the same 24 groups of 8 weights. The second rotation is the Hadamard matrix:</p>
+<p>Here are both, applied to the same 24 groups of 8 weights. PCA piles the energy into a few coordinates, and a flattening rotation spreads it out:</p>
 
 <figure class="widget wide" data-widget="pca">
-  <figcaption><strong>PCA and the Hadamard rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
+  <figcaption><strong>PCA and a flattening rotation on the same groups.</strong> Each row of a grid is one group of 8 weights (blue negative, red positive). The bars show how the total energy, the sum of squares, is divided among the 8 coordinates. Pick a data set, and compare how each rotation changes the largest coordinate and the rounding error of a group.</figcaption>
   <div class="sx-controls">
     <span class="sx-seg"><button data-ds="spiky" aria-pressed="true">each group has one big weight</button><button data-ds="corr" aria-pressed="false">weights move together</button></span>
     <button data-act="new">new data</button>
   </div>
-  <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after the Hadamard rotation, with the energy per coordinate below each"></svg>
+  <svg class="sx-pc" viewBox="0 0 900 285" role="img" aria-label="Three grids of 24 groups of 8 weights: as given, after PCA, and after a flattening rotation, with the energy per coordinate below each"></svg>
   <p class="sx-note" aria-live="polite">&nbsp;</p>
 </figure>
 
@@ -454,7 +452,7 @@
   <p class="sx-note">The slider is only an animation. A real PCA step applies one matrix, fitted to the data, all at once. The flattening rotation is the 60° turn about (1, 1, 1).</p>
 </figure>
 
-<p>Neither rotation is better in general; they are tools for different jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so a PCA rotation can help or hurt by chance. When the weights move together (the second), PCA is exactly the wrong tool for rounding: it makes every group spikier.</p>
+<p>PCA and a flattening rotation do opposite jobs. When the data has no preferred direction (the first data set), PCA's axes are close to arbitrary, so it can help or hurt by chance. When the weights move together (the second), PCA does exactly what compression wants and exactly what rounding does not: it makes every group spikier.</p>
 
 </details>
 
@@ -772,6 +770,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <footer class="site">MIT licensed · <a href="https://github.com/tslmy/local-siri-on-ipod-touch-4">source on GitHub</a></footer>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
-    <script src="assets/explainer.js?v=69" defer></script>
+    <script src="assets/explainer.js?v=70" defer></script>
   </body>
 </html>
