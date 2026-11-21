@@ -655,6 +655,8 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 
 <p id="step-3" data-toc="Step 3: snap to a codebook"><strong>Step 3: snap to a codebook made for bell curves.</strong></p>
 
+<h4 id="s3-expensive" data-toc="Per-group codebooks are expensive">Per-group codebooks are expensive to store</h4>
+
 <p>Before the codebook, a tempting thought needs breaking: that levels are cheap to store. That holds only for evenly spaced levels, where the scale alone fixes all of them. Evenly spaced levels fit the weights badly, so let us see what better ones cost.</p>
 
 <p>Take a group of 64 weights, which is the group size this project uses for SmolLM2 (Whistle uses 128). The 64 weights hardly spread evenly: most sit near zero and a few lie far out. Evenly spaced levels would be wasted on the sparse outer region, so we want the set of levels that fits <em>this</em> group best, which is not evenly spaced.</p>
@@ -672,7 +674,11 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>The table keeps growing: one row for every group, one column for every level. Each number takes 32 bits, and a group's 64 weights are stored as indices into its row. A full table is therefore a large part of what a group costs (at 16 levels, two thirds of it), and it is what the next step has to get rid of. The way out is to make every group look the same, so that one shared row serves them all. The arithmetic shows why that matters:</p>
+<p>The table keeps growing: one row for every group, one column for every level. Each number takes 32 bits, and a group's 64 weights are stored as indices into its row. A full table is therefore a large part of what a group costs (at 16 levels, two thirds of it).</p>
+
+<h4 id="s3-shared" data-toc="One shared codebook">One shared codebook</h4>
+
+<p>That table is what the rest of this step gets rid of. The way out is to make every group look the same, so that one shared row serves them all. The arithmetic shows why that matters:</p>
 
 <p>Take groups of \(G\) weights, \(b\)-bit indices, and \(c\)-bit numbers (\(c = 32\) here). Anything stored once for the whole model is negligible, so what counts is what is stored for every group:</p>
 \[ \begin{aligned} \text{shared codebook:}\quad & b + \frac{c}{G} \\ \text{fresh codebook per group:}\quad & b + \frac{2^b\,c}{G} \end{aligned} \]
@@ -988,6 +994,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=106" defer></script>
+    <script src="assets/explainer.js?v=107" defer></script>
   </body>
 </html>
