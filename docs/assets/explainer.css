@@ -286,3 +286,12 @@
 .sx-tcol .sx-hint { margin: .25rem 0 0; }
 .sx-trip .gnum2 { fill: var(--bg); font: bold 8px var(--sx-sans); }
 .sx-gr .olg { fill: none; stroke: var(--text); stroke-width: 1.4; pointer-events: none; }
+
+/* Figure: groups with an outlier lose more */
+.sx-ol { width: 100%; height: auto; display: block; }
+.sx-ol .ax { stroke: var(--muted); stroke-width: 1; }
+.sx-ol .lbl { fill: var(--muted); font: 11px var(--sx-sans); }
+.sx-ol .rowname { fill: var(--text); font-weight: bold; }
+.sx-ol .odot { opacity: .65; }
+.sx-ol .mean { stroke: var(--text); stroke-width: 2; }
+.sx-ol .meant { fill: var(--text); font-weight: bold; }

@@ -40,6 +40,9 @@
     return kids;
   };
 
+  // The grouping figure publishes its current groups here (the average rounding error of each, and whether it holds an outlier), so a later figure can show the same data
+  const groupingShare = { data: null, subs: [] };
+  const publishGrouping = (d) => { groupingShare.data = d; groupingShare.subs.forEach((f) => f(d)); };
   const press = (buttons, on) => buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === on)));
 
   // Jacobi rotations for a small symmetric matrix: eigenvectors (biggest eigenvalue first) and eigenvalues
@@ -782,6 +785,8 @@
       wsvg.setAttribute('viewBox', vb); wsvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => divColor(val(r, c), 3), outline: (r, c) => state.out && outl[r][c], label: (r, g) => st.scales[r][g].mx.toFixed(1) }));
       ssvg.setAttribute('viewBox', vb); ssvg.replaceChildren(...matrixGroups({ ...common, color: (r, g) => goldColor(st.scales[r][g].mx, gm), outline: (r, g) => state.out && outl[r].slice(g * gs, (g + 1) * gs).some((v) => v) }));
       esvg.setAttribute('viewBox', vb); esvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => redColor(st.err[r][c], .5), outline: (r, c) => state.out && outl[r][c] }));
+      const groups = []; for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) { const e = st.err[r].slice(g * gs, (g + 1) * gs); groups.push({ outlier: state.out && outl[r].slice(g * gs, (g + 1) * gs).some((v) => v), loss: e.reduce((a, x) => a + x, 0) / gs }); }
+      publishGrouping({ gs, ng, outliersOn: state.out, groups });
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
       setMath(store, `Storage per row: \\(${C}\\times 4 = ${idx}\\) bits for the indices, plus \\(${ng}\\times 32 = ${scl}\\) bits for the scale${ng > 1 ? 's' : ''}, \\(${st.rowBits}\\) bits in all (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`);
@@ -808,7 +813,33 @@
     info.textContent = 'Hover a cell to see its group.'; gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, rot2d: rot2dFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  // 9a. The groups of the grouping figure, split into those that contain an outlier and the rest: how much each loses to rounding
+  const outlierLossFig = (fig) => {
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note');
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / (a.length || 1);
+    const txt = (x, y, str, anchor, cls) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
+    const render = (d) => {
+      const withO = d.groups.filter((g) => g.outlier), without = d.groups.filter((g) => !g.outlier), all = d.groups.map((g) => g.loss);
+      const top = Math.max(...all) * 1.08, x0 = 170, x1 = 620, X = (v) => x0 + (x1 - x0) * v / top, kids = [];
+      const rows = [['With an outlier', withO, 'var(--sx-gold)', 52], ['Without', without, 'var(--sx-blue)', 118]];
+      kids.push(sv('line', { x1: x0, x2: x1, y1: 156, y2: 156, class: 'ax' }));
+      const step = top > 1 ? .5 : top > .5 ? .25 : .1;
+      for (let v = 0; v <= top; v += step) { kids.push(sv('line', { x1: X(v), x2: X(v), y1: 156, y2: 161, class: 'ax' })); kids.push(txt(X(v), 174, v.toFixed(2).replace(/0$/, ''), 'middle')); }
+      kids.push(txt((x0 + x1) / 2, 192, "average rounding error of the group's weights", 'middle'));
+      rows.forEach(([name, list, color, y]) => {
+        kids.push(txt(10, y - 4, name, 'start', 'lbl rowname'), txt(10, y + 12, `${list.length} group${list.length === 1 ? '' : 's'}`, 'start'));
+        list.forEach((g, i) => kids.push(sv('circle', { cx: X(g.loss), cy: y + (((i * 37) % 17) - 8) * 2, r: 3.6, class: 'odot' }, `fill:${color}`)));
+        if (list.length) { const m = mean(list.map((g) => g.loss)); kids.push(sv('line', { x1: X(m), x2: X(m), y1: y - 38, y2: y + 38, class: 'mean' })); kids.push(txt(X(m), y - 42, 'mean ' + m.toFixed(2), 'middle', 'lbl meant')); }
+      });
+      svg.replaceChildren(...kids);
+      note.textContent = !d.outliersOn || !withO.length
+        ? 'No group has an outlier right now. Tick "outliers" in the figure above (or press "New matrix") to see them.'
+        : `Groups of ${d.gs}: the ${withO.length} with an outlier lose ${mean(withO.map((g) => g.loss)).toFixed(2)} on average, the other ${without.length} lose ${mean(without.map((g) => g.loss)).toFixed(2)}. That is ${(mean(withO.map((g) => g.loss)) / mean(without.map((g) => g.loss))).toFixed(1)} times as much, for weights that are almost all ordinary.`;
+    };
+    groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
+  };
+
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, rot2d: rot2dFig, rot3d: rot3dFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // LaTeX in the text: \( inline \) and \[ display \], rendered by KaTeX when it has loaded (the raw LaTeX stays readable if it hasn't)
   window.addEventListener('load', () => {
