@@ -922,7 +922,7 @@
   // 9. Why weights are grouped: a toy matrix, per-group scales, rounding error and storage per row
   const groupingFig = (fig) => {
     const R = 12, C = 64, CW = 10, RH = 11, BARH = 46, SIZES = [64, 32, 16, 8, 4], NS = 'http://www.w3.org/2000/svg';
-    const state = { g: 0, out: true, nout: 6, size: 8, sel: 0 }; let seed = 7;
+    const state = { g: 3, out: true, nout: 6, size: 8, sel: 0 }; let seed = 7;
     const rng = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     const gauss = () => Math.sqrt(-2 * Math.log(rng() + 1e-12)) * Math.cos(2 * Math.PI * rng());
     let base = [], outl = [], outList = [];
@@ -963,7 +963,7 @@
       ssvg.setAttribute('viewBox', vb); ssvg.replaceChildren(...matrixGroups({ ...common, color: (r, g) => goldColor(st.scales[r][g].mx, gm), outline: (r, g) => state.out && outl[r].slice(g * gs, (g + 1) * gs).some((v) => v) }));
       esvg.setAttribute('viewBox', vb); esvg.replaceChildren(...matrixCells({ ...common, color: (r, c) => redColor(st.err[r][c], .5), outline: (r, c) => state.out && outl[r][c] }));
       const groups = []; for (let r = 0; r < R; r++) for (let g = 0; g < ng; g++) { const e = st.err[r].slice(g * gs, (g + 1) * gs); groups.push({ outlier: state.out && outl[r].slice(g * gs, (g + 1) * gs).some((v) => v), loss: e.reduce((a, x) => a + x, 0) / gs }); }
-      publishGrouping({ gs, ng, outliersOn: state.out, groups });
+      publishGrouping({ gs, ng, outliersOn: state.out, groups, values: Array.from({ length: R }, (_, r) => Array.from({ length: C }, (_, c) => val(r, c))) });
       const idx = C * 4, scl = ng * 32;
       $(fig, '.sx-gbar .idx').style.width = `${idx / MAXBITS * 100}%`; $(fig, '.sx-gbar .scl').style.width = `${scl / MAXBITS * 100}%`;
       setMath(store, `Storage per row: \\(${C}\\times 4 = ${idx}\\) bits for the indices, plus \\(${ng}\\times 32 = ${scl}\\) bits for the scale${ng > 1 ? 's' : ''}, \\(${st.rowBits}\\) bits in all (${st.rowBits / 8} bytes). Relative error: ${(st.rel * 100).toFixed(1)}%.`);
@@ -1013,6 +1013,40 @@
       note.textContent = !d.outliersOn || !withO.length
         ? 'No group has an outlier right now. Raise "Groups with outliers" in the figure above (or press "New matrix") to see them.'
         : `Groups of ${d.gs}: the ${withO.length} with an outlier lose ${mean(withO.map((g) => g.loss)).toFixed(2)} on average, the other ${without.length} lose ${mean(without.map((g) => g.loss)).toFixed(2)}. That is ${(mean(withO.map((g) => g.loss)) / mean(without.map((g) => g.loss))).toFixed(1)} times as much, for weights that are almost all ordinary.`;
+    };
+    groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
+  };
+
+  // 9b. Histogram of the grouping figure's weights, before and after rotating each group
+  const histFig = (fig) => {
+    const svg = $(fig, 'svg'), note = $(fig, '.sx-note');
+    const fwht = (x) => { const y = x.slice(), n = y.length; for (let h = 1; h < n; h *= 2) for (let i = 0; i < n; i += 2 * h) for (let j = i; j < i + h; j++) { const a = y[j], b = y[j + h]; y[j] = a + b; y[j + h] = a - b; } return y.map((v) => v / Math.sqrt(n)); };
+    const txt = (x, y, str, anchor, cls) => { const t = sv('text', { x, y, 'text-anchor': anchor, class: cls || 'lbl' }); t.textContent = str; return t; };
+    const render = (d) => {
+      const gs = d.gs, before = [], after = [], flag = []; let gi = 0;
+      d.values.forEach((row) => { for (let g = 0; g < row.length; g += gs) { const raw = row.slice(g, g + gs), l = Math.sqrt(raw.reduce((a, v) => a + v * v, 0) / gs) || 1, grp = raw.map((v) => v / l); before.push(...grp); after.push(...fwht(grp)); const o = d.outliersOn && d.groups[gi++].outlier; for (let k = 0; k < gs; k++) flag.push(o); } });
+      const n = before.length, xm = Math.max(4, Math.ceil(Math.max(...before.map(Math.abs), ...after.map(Math.abs)))), NB = 4 * xm + 1, bw = 2 * xm / NB;
+      const bins = (a, keep) => { const c = new Array(NB).fill(0); a.forEach((v, i) => { if (keep(i)) c[Math.min(NB - 1, Math.max(0, Math.floor((v + xm) / bw)))]++; }); return c; };
+      const all = [bins(before, () => true), bins(after, () => true)], odd = [bins(before, (i) => flag[i]), bins(after, (i) => flag[i])], top = Math.max(...all[0], ...all[1]) * 1.1;
+      const kids = [], W = 296, H = 130, Y0 = 36, dens = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+      ['Before rotation', 'After rotating each group'].forEach((title, p) => {
+        const ox = p * 324, X = (v) => ox + 8 + (W - 16) * (v + xm) / (2 * xm), Y = (k) => Y0 + H - H * k / top, cw = (W - 16) / NB;
+        kids.push(txt(ox + W / 2, 16, title, 'middle', 'lbl rowname'));
+        all[p].forEach((k, i) => {
+          if (!k) return; const x = ox + 8 + cw * i + .5, hAll = H * k / top, hOdd = odd[p][i] ? Math.max(3, H * odd[p][i] / top) : 0;
+          kids.push(sv('rect', { x, y: Y0 + H - hAll, width: cw - 1, height: hAll }, 'fill:var(--sx-blue);opacity:.8'));
+          if (hOdd) kids.push(sv('rect', { x, y: Y0 + H - hOdd, width: cw - 1, height: hOdd }, 'fill:var(--sx-gold)'));
+        });
+        const pts = []; for (let i = 0; i <= 80; i++) { const z = -xm + 2 * xm * i / 80; pts.push(`${X(z).toFixed(1)},${Y(n * bw * dens(z)).toFixed(1)}`); }
+        kids.push(sv('polyline', { points: pts.join(' '), fill: 'none', class: 'mean' }, 'stroke-dasharray:4 3;stroke-width:1.5'));
+        kids.push(sv('line', { x1: ox + 8, x2: ox + W - 8, y1: Y0 + H, y2: Y0 + H, class: 'ax' }));
+        for (let t = -xm; t <= xm; t += xm > 6 ? 4 : 2) { kids.push(sv('line', { x1: X(t), x2: X(t), y1: Y0 + H, y2: Y0 + H + 4, class: 'ax' })); kids.push(txt(X(t), Y0 + H + 16, t ? (t > 0 ? '+' : '−') + Math.abs(t) + 'σ' : '0', 'middle')); }
+      });
+      svg.replaceChildren(...kids);
+      const nOdd = flag.filter(Boolean).length / gs;
+      note.textContent = nOdd
+        ? `Groups of ${gs}: the ${nOdd} gold groups contain an outlier. Before rotation, each puts one weight far out at about ${Math.sqrt(gs).toFixed(1)}σ and the other ${gs - 1} piled up near zero; after it, all ${gs} sit at similar sizes, inside the bell. The dashed curve is an ideal bell curve.`
+        : `Groups of ${gs}, no outliers right now. Raise "Groups with outliers" above to see how they show up. The dashed curve is an ideal bell curve.`;
     };
     groupingShare.subs.push(render); if (groupingShare.data) render(groupingShare.data);
   };
@@ -1096,7 +1130,7 @@
     gen(); draw();
   };
 
-  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
+  const widgets = { inventory, repair, ace, ram, timeline, hadamard: hadamardFig, cq: cqFig, spread: spreadFig, fwht: fwhtFig, grouping: groupingFig, outlierloss: outlierLossFig, hist: histFig, rot2d: rot2dFig, rot3dg: rot3dgFig, lloyd: lloydFig, sizecalc: sizeCalcFig, reuse: reuseFig, pca: pcaFig, pca3d: pca3dFig, quantize: quantizeFig };
   document.querySelectorAll('figure.widget').forEach((fig) => { const f = widgets[fig.dataset.widget]; if (f) f(fig); });
   // A contents column that floats on the left of wide windows: every numbered section, the 4-bit section's steps, and a highlight on the one being read
   (() => {
