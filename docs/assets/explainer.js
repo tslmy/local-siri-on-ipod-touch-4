@@ -354,7 +354,7 @@
     const everyone = () => sc.subs.forEach((f) => f());
     const mode = () => (has('quant') ? sc.st.mode : 'plain');      // before quantization has been introduced, show the weights as they are
     const vecs = (grp, md, d) => grp.map((g) => turn2(g.dir, d).map((x) => x * (md === 'plain' ? g.len : 1)));
-    const quant = (p, md) => { const m = md === 'plain' ? Math.max(...p.map(Math.abs)) : FLAT, st = 2 * m / 3, q = p.map((x) => -m + Math.max(0, Math.min(3, Math.round((x + m) / st))) * st); return { m, q, err: Math.hypot(p[0] - q[0], p[1] - q[1]) / Math.hypot(...p) }; };
+    const quant = (p, md) => { const m = md === 'plain' ? Math.max(...p.map(Math.abs)) : FLAT, st = 2 * m / 3, ix = p.map((x) => Math.max(0, Math.min(3, Math.round((x + m) / st)))), q = ix.map((k) => -m + k * st); return { m, q, ix, err: Math.hypot(p[0] - q[0], p[1] - q[1]) / Math.hypot(...p) }; };
     const draw = () => {
       const grp = groupsOf(sc), md = mode(), N = grp.length, col = (i) => `var(--pc${i % 8})`; rot.sel = Math.min(rot.sel, N - 1);
       const P = vecs(grp, md, rot.deg), P0 = vecs(grp, md, 0), Q = P.map((p) => quant(p, md));
@@ -397,9 +397,15 @@
           kids.push(line(x1, y1, bx, by, 'snap3', `stroke:${col(i)};stroke-width:${wd}`), sv('polygon', { points: tri, class: 'arrh' }, `fill:${col(i)}`));
         });
       }
+      const bin = (k) => k.toString(2).padStart(2, '0');
+      if (has('bits')) {                                 // each grid point is a possible stored value: its level numbers, in binary, are what is saved
+        const o = Q[rot.sel], st = 2 * o.m / 3;
+        for (let k = 0; k < 4; k++) { const lv = -o.m + k * st, [bx, by] = pt(lv, -o.m), [lx, ly] = pt(-o.m, lv); kids.push(word(bx, by + 14, bin(k), 'middle', 'lbl bitk', `fill:${col(rot.sel)}`), word(lx - 6, ly + 3.5, bin(k), 'end', 'lbl bitk', `fill:${col(rot.sel)}`)); }
+      }
       if (has('ghost')) P0.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 4, class: 'ghost' }, `stroke:${col(i)}`)); });   // where the groups started, relative to the axes
       P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]); kids.push(sv('circle', { cx, cy, r: 5.5, class: 'pt' + (i === rot.sel ? ' sel' : ''), 'data-i': i }, `fill:${col(i)}`)); });
       P.forEach((p, i) => { const [cx, cy] = pt(p[0], p[1]), right = cx >= CX; kids.push(word(cx + (right ? 9 : -9), cy + 4, i + 1, right ? 'start' : 'end', 'lbl gnum', `fill:${col(i)}`)); });
+      if (has('bits')) Q.forEach((o, i) => { const [x, y] = pt(o.q[0], o.q[1]), below = y >= CY; let right = x >= CX; if (right && x > 330 - 52) right = false; else if (!right && x < 52) right = true; kids.push(word(x + (right ? 8 : -8), y + (below ? 15 : -9), `(${o.ix.map(bin).join(',')})`, right ? 'start' : 'end', 'lbl bitl', `fill:${col(i)}`)); });   // flip inwards near the edges so the label stays in view   // the stored value of each group
       let curve = null;
       if (has('curve')) {                                // the largest weight as a share of the group's length, at every angle
         const spike = (d) => grp.reduce((a, g) => { const q = turn2(g.dir, d); return a + Math.max(Math.abs(q[0]), Math.abs(q[1])); }, 0) / N;

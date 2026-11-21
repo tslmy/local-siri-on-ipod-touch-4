@@ -297,3 +297,4 @@
 .sx-ol .meant { fill: var(--text); font-weight: bold; }
 .sx-r2 .arrh { stroke: none; }
 .sx-r2 .axl { font-style: italic; fill: var(--text); }
+.sx-r2 .bitl, .sx-r2 .bitk { font: bold 10px var(--sx-mono); paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
