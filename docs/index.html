@@ -803,24 +803,24 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p id="step-4" data-toc="Step 4: never rebuild the weights"><strong>Step 4: never rebuild the weights.</strong></p>
+<p id="step-4" data-toc="Step 4: never rebuild the weights"><strong>Step 4: never rebuild the weights.</strong> Steps 1 to 3 made the weights small. This step keeps them small while the model runs, and makes using them fast.</p>
 <ul>
 <li><strong>The problem:</strong> steps 2 and 3 store rotated, rounded weights. To use one you'd normally decode it: look up its level, multiply by the length, rotate back.</li>
 <li>Doing that for 135 million weights per word would be slow on a 2010 CPU, and it would rebuild the full-size weights we worked to avoid keeping.</li>
 <li><strong>The way out:</strong> a layer only needs dot products, and rotating both sides of a <a href="https://en.wikipedia.org/wiki/Dot_product">dot product</a> doesn't change it. So rotate the other side, the activations, instead, and never touch the weights.</li>
 </ul>
-<p>What a layer computes is the weights' dot product with the incoming numbers (the activations), and since the rotation is its own inverse:</p>
-\[ \mathbf{w}\cdot\mathbf{x} \;=\; (H\mathbf{w})\cdot(H\mathbf{x}) \;=\; \ell\sum_k c_{\mathrm{idx}_k}\,(H\mathbf{x})_k \]
-<p>Here \(\mathbf{w}\) is a group of weights, \(\mathbf{x}\) the matching activations, \(\ell\) the group's length, \(c\) the codebook, and \(\mathrm{idx}_k\) the index stored for weight \(k\).</p>
+<p>A layer computes dot products of the weights with the incoming numbers (the activations). Because the rotation \(H\) is orthogonal, rotating both sides leaves the dot product unchanged:</p>
+\[ \mathbf{w}\cdot\mathbf{x} \;=\; (H\mathbf{w})\cdot(H\mathbf{x}) \;\approx\; \ell\sum_k c_{\mathrm{idx}_k}\,(H\mathbf{x})_k \]
+<p>Here \(\mathbf{w}\) is a group of weights, \(\mathbf{x}\) the matching activations, \(\ell\) the group's length, \(c\) the codebook, and \(\mathrm{idx}_k\) the index stored for weight \(k\). The first equality is exact. The \(\approx\) is where the rounding enters: the stored level only approximates the \(k\)-th entry of \(H\mathbf{w}\), divided by \(\ell\).</p>
 <p>So in practice:</p>
 <ul>
-<li>The kernel rotates the <em>activations</em> once per group and reuses them for every row of the matrix: thousands of rows share one rotation.</li>
+<li>The kernel rotates the <em>activations</em> once for each block of \(G\) of them and reuses the result for every row of the matrix: thousands of rows share one rotation.</li>
 <li>The weights stay as indices.</li>
 <li>On the iPod's <a href="https://en.wikipedia.org/wiki/ARM_architecture_family#Advanced_SIMD_(Neon)">NEON</a> unit, one table-lookup instruction (<code>vtbl</code>) turns 8 indices into 8 small integer levels.</li>
 <li>Multiply-accumulate instructions then sum 8 or 16 products at a time.</li>
 </ul>
 
-<p>Here is the shortcut with real numbers. Both routes give the same answer, but rotating the activations once is much cheaper when many rows share them:</p>
+<p>Here is the shortcut with actual numbers. Both routes give the same answer, but rotating the activations once is much cheaper when many rows share them:</p>
 
 <figure class="widget wide" data-widget="reuse">
   <figcaption><strong>Rotate the activations, not the weights.</strong> The top shows one group of 8 weights and the 8 activations they meet. The bottom counts the operations for groups of 64 when a matrix has many rows.</figcaption>
@@ -857,11 +857,11 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>What each step buys, measured on random groups of 64 and on SmolLM2's real layers:</p>
+<p>What rotation and the codebook buy, measured on random groups of 64 and on SmolLM2's real layers:</p>
 <ul>
 <li><strong>Rotation</strong> is the big win when a group has outliers. For heavy-tailed groups it halves the error at 4 bits (18% → 9%) and cuts it from 86% to 36% at 2 bits.</li>
 <li><strong>The Gaussian codebook</strong> adds a little on top, mostly at 2 bits (36% → 33%). SmolLM2's real layers are closer to Gaussian already: at 2 bits the codebook takes their error from about 40% to 34%; at 4 bits every method lands near 10%.</li>
-<li>So at 4 bits most of the measured quality gain for SmolLM2 came from GPTQ (below), and the format's other strength is speed, which is step 4.</li>
+<li>So at 4 bits most of the measured quality gain for SmolLM2 came from GPTQ (next), and the format's other strength is speed, which is step 4.</li>
 </ul>
 
 <p>What it costs to store:</p>
@@ -871,7 +871,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <li>Whistle is 16.9 MB.</li>
 </ul>
 
-<p>The shared parts are almost free, and the alternatives are not. Per weight, for groups of 64 and 32-bit numbers:</p>
+<p>The shared parts are almost free: the codebook is 16 numbers, 64 bytes for the whole model, and the Hadamard matrix costs nothing, because the doubling rule generates it. The alternatives that step 3 ruled out are not. Per weight, for groups of 64 and 32-bit numbers:</p>
 <div class="wide"><table>
 <thead><tr><th>What is stored</th><th class="num">Bits per weight</th><th class="num">SmolLM2</th></tr></thead>
 <tbody>
@@ -881,11 +881,6 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 <tr><td>A different dense random rotation for every group, instead of the Hadamard matrix (\(64\times 64\) numbers each)</td><td class="num">about 2,050</td><td class="num">about 34 GB</td></tr>
 </tbody>
 </table></div>
-<ul>
-<li><strong>The shared codebook costs 64 bytes</strong> (16 numbers) for the whole model, and the Hadamard matrix costs nothing, because the doubling rule generates it.</li>
-<li><strong>A fresh codebook per group</strong> would fit each group better, but its 16 numbers are twice the size of the group's 64 four-bit indices, so the model would be 2.7 times bigger and would leave little of the 256 MB for anything else.</li>
-<li><strong>A different dense rotation per group</strong> would cost 512 times more than the weights it rotates, and could not be applied cheaply either.</li>
-</ul>
 
 <p>Other choices cost other amounts. Try a few and compare with the iPod's 256 MB of RAM:</p>
 
@@ -899,7 +894,7 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
   <p class="sx-note sx-readout" aria-live="polite">&nbsp;</p>
 </figure>
 
-<p>One more refinement is for SmolLM2 only:</p>
+<p id="gptq" data-toc="Rounding smarter: GPTQ"><strong>Rounding smarter: GPTQ.</strong> One more refinement is for SmolLM2 only. It changes only which level each weight rounds to, so the stored format and the kernel stay the same.</p>
 <ul>
 <li>Rounding each weight to its nearest level is the simplest choice, but not the best one: the errors of neighbouring weights can add up or cancel out.</li>
 <li><a href="https://arxiv.org/abs/2210.17323">GPTQ</a> rounds the weights one at a time and nudges the not-yet-rounded ones to compensate, using statistics of real activations (here, from 40 chat questions).</li>
@@ -918,14 +913,14 @@ That gives a matrix for every size that doubles from 2: 4, 8, 16, and so on up t
 </tbody>
 </table></div>
 
-<p>How Whistle compares with the model it replaced:</p>
+<p id="vs-moonshine" data-toc="Whistle against what it replaced"><strong>Whistle against what it replaced.</strong></p>
 <ul>
 <li>The earlier pair, <a href="https://huggingface.co/UsefulSensors/moonshine-tiny">Moonshine Tiny</a> (<a href="https://arxiv.org/abs/2410.15608">paper</a>, 30 MB) and the evenly spaced 4/8-bit SmolLM2 (98 MB), is still supported as a fallback.</li>
 <li>Whistle matched Moonshine's speed on the iPod with half the memory.</li>
 <li>On six questions asked by a real voice, Whistle got two right and Moonshine none.</li>
 </ul>
 
-<p>The daemon also does a few things to save time:</p>
+<p><strong>Smaller time savers.</strong> The daemon also does a few things that have nothing to do with the weights:</p>
 <ul>
 <li>It trims silence before speech recognition. Siri often keeps recording for seconds after you stop, and recognition time grows with audio length.</li>
 <li>It skips Siri's end tone.</li>
@@ -992,6 +987,6 @@ IPOD=root@&lt;your iPod&gt; just install</pre>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" integrity="sha384-XjKyOOlGwcjNTAIQHIpgOno0Hl1YQqzUOEleOLALmuqehneUG+vnGctmUb0ZY0l8" crossorigin="anonymous" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js" integrity="sha384-+VBxd3r6XgURycqtZ117nYw44OOcIax56Z4dCRWbxyPt0Koah1uHoK0o4+/RRE05" crossorigin="anonymous" defer></script>
     <script src="assets/weight-hist.js?v=2" defer></script>
-    <script src="assets/explainer.js?v=116" defer></script>
+    <script src="assets/explainer.js?v=117" defer></script>
   </body>
 </html>
