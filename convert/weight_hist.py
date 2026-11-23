@@ -20,7 +20,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(__file__))
 from cq import hadamard  # noqa: E402
 
-PATH = glob.glob(os.path.expanduser("~/.cache/huggingface/hub/models--HuggingFaceTB--SmolLM2-135M-Instruct/snapshots/*/model.safetensors"))[0]
+PATH = glob.glob(
+    os.path.expanduser(
+        "~/.cache/huggingface/hub/models--HuggingFaceTB--SmolLM2-135M-Instruct/snapshots/*/model.safetensors"
+    )
+)[0]
 GROUPS, XM, BW = (8, 16, 32, 64), 6.0, 0.25
 NB = int(2 * XM / BW)
 
@@ -36,7 +40,7 @@ def load(path):
             a, b = v["data_offsets"]
             f.seek(base + a)
             raw = np.frombuffer(f.read(b - a), dtype=np.uint16)
-            yield k, (raw.astype(np.uint32) << 16).view(np.float32).reshape(v["shape"])   # bf16 -> float32
+            yield k, (raw.astype(np.uint32) << 16).view(np.float32).reshape(v["shape"])  # bf16 -> float32
 
 
 def klass(name):
@@ -68,32 +72,63 @@ for name, W in load(PATH):
         Hm = hadamard(g).astype(np.float64).T
         R = U @ Hm
         V = W.astype(np.float64)
-        V = (V / np.sqrt((V * V).mean())).reshape(-1, g)       # raw: only the whole matrix is scaled
+        V = (V / np.sqrt((V * V).mean())).reshape(-1, g)  # raw: only the whole matrix is scaled
         T = V @ Hm
         for key in (c, "all"):
-            d = acc.setdefault((key, g), {"b": np.zeros(NB, np.int64), "a": np.zeros(NB, np.int64), "n": 0, "sb": [0, 0, 0, 0], "sa": [0, 0, 0, 0], "mb": 0, "ma": 0,
-                                          "rb": np.zeros(NB, np.int64), "ra": np.zeros(NB, np.int64), "nr": 0, "tb": [0, 0, 0, 0], "ta": [0, 0, 0, 0], "nb": 0, "nbr": 0, "rmb": 0, "rma": 0})
-            d["b"] += hist(U.ravel()); d["a"] += hist(R.ravel()); d["n"] += U.size
-            d["rb"] += hist(V.ravel()); d["ra"] += hist(T.ravel()); d["nr"] += V.size
+            d = acc.setdefault(
+                (key, g),
+                {
+                    "b": np.zeros(NB, np.int64),
+                    "a": np.zeros(NB, np.int64),
+                    "n": 0,
+                    "sb": [0, 0, 0, 0],
+                    "sa": [0, 0, 0, 0],
+                    "mb": 0,
+                    "ma": 0,
+                    "rb": np.zeros(NB, np.int64),
+                    "ra": np.zeros(NB, np.int64),
+                    "nr": 0,
+                    "tb": [0, 0, 0, 0],
+                    "ta": [0, 0, 0, 0],
+                    "nb": 0,
+                    "nbr": 0,
+                    "rmb": 0,
+                    "rma": 0,
+                },
+            )
+            d["b"] += hist(U.ravel())
+            d["a"] += hist(R.ravel())
+            d["n"] += U.size
+            d["rb"] += hist(V.ravel())
+            d["ra"] += hist(T.ravel())
+            d["nr"] += V.size
             for s, X in (("sb", U), ("sa", R), ("tb", V), ("ta", T)):
-                d[s][0] += (X ** 4).sum(); d[s][1] += (np.abs(X) > 3).sum()
-            d["mb"] = max(d["mb"], np.abs(U).max()); d["ma"] = max(d["ma"], np.abs(R).max())
-            d["rmb"] = max(d["rmb"], np.abs(V).max()); d["rma"] = max(d["rma"], np.abs(T).max())
+                d[s][0] += (X**4).sum()
+                d[s][1] += (np.abs(X) > 3).sum()
+            d["mb"] = max(d["mb"], np.abs(U).max())
+            d["ma"] = max(d["ma"], np.abs(R).max())
+            d["rmb"] = max(d["rmb"], np.abs(V).max())
+            d["rma"] = max(d["rma"], np.abs(T).max())
 
 out = {"model": "SmolLM2-135M-Instruct", "bins": {"lo": -XM, "width": BW, "n": NB}, "data": {}}
 for (key, g), d in sorted(acc.items()):
     n = d["n"]
     out["data"][f"{key}/{g}"] = {
-        "n": int(n), "before": d["b"].tolist(), "after": d["a"].tolist(),
-        "kurt": [round(d["sb"][0] / n, 2), round(d["sa"][0] / n, 2)],          # fourth moment; a Gaussian has 3
-        "beyond3": [round(d["sb"][1] / n * 100, 3), round(d["sa"][1] / n * 100, 3)],   # % of weights beyond 3 sigma
+        "n": int(n),
+        "before": d["b"].tolist(),
+        "after": d["a"].tolist(),
+        "kurt": [round(d["sb"][0] / n, 2), round(d["sa"][0] / n, 2)],  # fourth moment; a Gaussian has 3
+        "beyond3": [round(d["sb"][1] / n * 100, 3), round(d["sa"][1] / n * 100, 3)],  # % of weights beyond 3 sigma
         "max": [round(float(d["mb"]), 1), round(float(d["ma"]), 1)],
-        "rawbefore": d["rb"].tolist(), "rawafter": d["ra"].tolist(),
+        "rawbefore": d["rb"].tolist(),
+        "rawafter": d["ra"].tolist(),
         "rawkurt": [round(d["tb"][0] / n, 2), round(d["ta"][0] / n, 2)],
         "rawbeyond3": [round(d["tb"][1] / n * 100, 3), round(d["ta"][1] / n * 100, 3)],
         "rawmax": [round(float(d["rmb"]), 1), round(float(d["rma"]), 1)],
     }
     e = out["data"][f"{key}/{g}"]
-    print(key, g, n, e["kurt"], e["beyond3"], e["max"], "RAW", e["rawkurt"], e["rawbeyond3"], e["rawmax"], file=sys.stderr)
+    print(
+        key, g, n, e["kurt"], e["beyond3"], e["max"], "RAW", e["rawkurt"], e["rawbeyond3"], e["rawmax"], file=sys.stderr
+    )
 json.dump(out, sys.stdout, separators=(",", ":"))
 sys.stdout.write("\n")
